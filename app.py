@@ -397,11 +397,47 @@ var MESES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','
 
 function fmt(v){ return Math.round(v||0).toLocaleString('es-MX'); }
 
+function toggleTodasSemanas(){
+  var chks = document.querySelectorAll('#semDropMenu input[type=checkbox].sem-chk');
+  var chkAll = document.getElementById('chkTodasSem');
+  var allChecked = chkAll.checked;
+  chks.forEach(function(c){
+    c.checked = allChecked;
+    var s = parseInt(c.value);
+    var row = document.getElementById('sem-row-'+s);
+    if(row) row.className = 'sem-item' + (allChecked ? ' on' : '');
+  });
+  onSemChk();
+}
+
+function syncChkTodas(){
+  var chks = document.querySelectorAll('#semDropMenu input[type=checkbox].sem-chk');
+  var chkAll = document.getElementById('chkTodasSem');
+  if(!chkAll) return;
+  var total = chks.length, checked = 0;
+  chks.forEach(function(c){ if(c.checked) checked++; });
+  chkAll.checked = (checked === total);
+  chkAll.indeterminate = (checked > 0 && checked < total);
+}
+
 function init(){
   window.onerror = function(m,s,l){
     document.body.innerHTML='<p style="padding:20px;color:red">Error: '+m+' (línea '+l+')</p>';
   };
   var menu = document.getElementById('semDropMenu');
+
+  // ── Opción "Seleccionar todas" ──
+  var rowAll = document.createElement('label');
+  rowAll.id = 'sem-row-all';
+  rowAll.style.cssText = 'display:flex;align-items:center;gap:6px;padding:5px 10px;cursor:pointer;font-weight:700;border-bottom:1px solid #ddd;background:#f5f5f5;font-size:.72rem';
+  var chkAll = document.createElement('input');
+  chkAll.type = 'checkbox';
+  chkAll.id = 'chkTodasSem';
+  chkAll.onchange = function(){ toggleTodasSemanas(); };
+  rowAll.appendChild(chkAll);
+  rowAll.appendChild(document.createTextNode('Seleccionar todas'));
+  menu.appendChild(rowAll);
+
   DATA.semanas.forEach(function(s){
     var yr = Math.floor(s/100), wk = s%100;
     var labelTxt = (yr >= 2000) ? yr+' · Semana '+String(wk).padStart(2,'0') : 'Semana '+String(s).padStart(2,'0');
@@ -411,6 +447,7 @@ function init(){
     row.id = 'sem-row-'+s;
     var chk = document.createElement('input');
     chk.type = 'checkbox';
+    chk.className = 'sem-chk';
     chk.value = s;
     chk.checked = isLast;
     chk.onchange = function(){ onSemChk(); };
@@ -470,6 +507,7 @@ function onSemChk(){
   state.tiendaT = null;
   updateSemLabel();
   updateHeader();
+  syncChkTodas();
   if(state.view==='producto') render(); else renderTienda();
 }
 
