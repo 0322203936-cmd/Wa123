@@ -268,7 +268,10 @@ select{border:1px solid #bbb;border-radius:4px;padding:3px 7px;font-size:.72rem;
 .chip-wrap{display:flex;flex-wrap:wrap;gap:4px;flex:1}
 .chip{padding:2px 9px;border-radius:12px;font-size:.67rem;cursor:pointer;border:1px solid #bbb;color:#333;background:#fff;transition:.15s}
 .chip:hover{border-color:#0071ce;color:#0071ce}
-.chip.on{background:#0071ce;color:#fff;border-color:#0071ce}
+.chk-label{display:inline-flex;align-items:center;gap:3px;font-size:.67rem;color:#333;cursor:pointer;padding:2px 6px;border:1px solid #bbb;border-radius:4px;background:#fff;white-space:nowrap}
+.chk-label:hover{border-color:#0071ce;color:#0071ce}
+.chk-label input{accent-color:#0071ce;cursor:pointer;width:12px;height:12px}
+.chk-label.on{background:#e8f0fe;border-color:#0071ce;color:#0071ce;font-weight:600}
 .grid{display:grid;grid-template-columns:1fr 1fr;padding:8px 16px;gap:8px;width:100%;box-sizing:border-box}
 .box{border:1px solid #bbb;border-radius:4px;overflow:visible}
 .box-hdr{background:#f0f0f0;border-bottom:1px solid #bbb;padding:4px 10px;text-align:center;font-size:.74rem;font-weight:700;color:#111}
@@ -324,7 +327,7 @@ html,body{height:auto;overflow-y:auto}
 
   <div class="ctrl">
     <label>Semana:</label>
-    <select id="semSel" onchange="onSem(this.value)"></select>
+    <div id="semChkWrap" style="display:flex;flex-wrap:wrap;gap:4px;max-width:600px"></div>
     <label>Tienda:</label>
     <div class="chip-wrap" id="chips"></div>
     <div style="margin-top:12px; display:flex; gap:8px;">
@@ -382,7 +385,7 @@ html,body{height:auto;overflow-y:auto}
 
 <script>
 var DATA = JSON.parse(atob('__DATA_JSON__'));
-var state = { semana: null, tienda: null, view: 'producto', tiendaT: null };
+var state = { semana: null, semanas_sel: null, tienda: null, view: 'producto', tiendaT: null };
 var DIAS  = ['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
 var MESES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
 
@@ -392,26 +395,54 @@ function init(){
   window.onerror = function(m,s,l){
     document.body.innerHTML='<p style="padding:20px;color:red">Error: '+m+' (línea '+l+')</p>';
   };
-  var sel = document.getElementById('semSel');
-  // Opción global al inicio
-  var optAll = document.createElement('option');
-  optAll.value = 'all';
-  optAll.textContent = '— Todas las semanas —';
-  sel.appendChild(optAll);
+  var wrap = document.getElementById('semChkWrap');
   DATA.semanas.forEach(function(s){
-    var opt = document.createElement('option');
-    opt.value = s;
     var yr = Math.floor(s/100), wk = s%100;
-    opt.textContent = yr+' · Semana '+String(wk).padStart(2,'0');
-    if(yr < 2000){ opt.textContent = 'Semana '+String(s).padStart(2,'0'); }
-    sel.appendChild(opt);
+    var label = (yr >= 2000) ? yr+' · S'+String(wk).padStart(2,'0') : 'S'+String(s).padStart(2,'0');
+    var isLast = (s === DATA.semanas[DATA.semanas.length-1]);
+    var lbl = document.createElement('label');
+    lbl.className = 'chk-label' + (isLast ? ' on' : '');
+    lbl.id = 'lbl-sem-'+s;
+    var chk = document.createElement('input');
+    chk.type = 'checkbox';
+    chk.value = s;
+    chk.checked = isLast;
+    chk.onchange = function(){ onSemChk(); };
+    lbl.appendChild(chk);
+    lbl.appendChild(document.createTextNode(label));
+    wrap.appendChild(lbl);
   });
   state.semana = DATA.semanas[DATA.semanas.length-1];
-  sel.value    = state.semana;
+  state.semanas_sel = [state.semana];
   state.tienda = DATA.tiendas[0];
   buildChips(); updateHeader(); render();
   document.getElementById('loader').style.display = 'none';
   document.getElementById('app').style.display    = 'block';
+}
+
+function onSemChk(){
+  var chks = document.querySelectorAll('#semChkWrap input[type=checkbox]');
+  var selected = [];
+  chks.forEach(function(c){
+    var s = parseInt(c.value);
+    var lbl = document.getElementById('lbl-sem-'+s);
+    if(c.checked){
+      selected.push(s);
+      if(lbl) lbl.className = 'chk-label on';
+    } else {
+      if(lbl) lbl.className = 'chk-label';
+    }
+  });
+  state.semanas_sel = selected;
+  state.semana = selected.length > 0 ? selected[selected.length-1] : 'all';
+  state.tiendaT = null;
+  updateHeader();
+  if(state.view==='producto') render(); else renderTienda();
+}
+
+function onSem(sel){
+  // fallback por compatibilidad
+  onSemChk();
 }
 
 function buildChips(){
@@ -422,16 +453,35 @@ function buildChips(){
 }
 
 function selTienda(t){ state.tienda=t; buildChips(); updateHeader(); if(state.view==='producto') render(); else renderTienda(); }
-function onSem(v){ state.semana = (v==='all') ? 'all' : parseInt(v); state.tiendaT = null; updateHeader(); if(state.view==='producto') render(); else renderTienda(); }
+function onSem(sel){
+  var selected = [];
+  for(var i=0;i<sel.options.length;i++){
+    if(sel.options[i].selected) selected.push(parseInt(sel.options[i].value));
+  }
+  state.semanas_sel = selected;
+  state.semana = selected.length > 0 ? selected[selected.length-1] : 'all';
+  state.tiendaT = null;
+  updateHeader();
+  if(state.view==='producto') render(); else renderTienda();
+}
 
 function updateHeader(){
-  if(state.semana === 'all'){
+  var sems = getSemanasActivas();
+  var isAll = (!state.semanas_sel || state.semanas_sel.length === 0);
+  document.getElementById('hdrTienda').textContent = state.tienda;
+  if(isAll){
     var s0 = DATA.semanas[0], sN = DATA.semanas[DATA.semanas.length-1];
     var f0 = (DATA.fecha_por_semana && (DATA.fecha_por_semana[String(s0)] || DATA.fecha_por_semana[s0])) || '—';
     var fN = (DATA.fecha_por_semana && (DATA.fecha_por_semana[String(sN)] || DATA.fecha_por_semana[sN])) || '—';
     document.getElementById('hdrFecha').textContent  = f0 + ' — ' + fN;
     document.getElementById('hdrSem').textContent    = 'Global';
-    document.getElementById('hdrTienda').textContent = state.tienda;
+    document.getElementById('projTitle').textContent = 'Proyección';
+    return;
+  }
+  if(sems.length > 1){
+    var semNums = sems.map(function(s){ return s > 9999 ? s%100 : s; });
+    document.getElementById('hdrFecha').textContent  = sems.length + ' semanas seleccionadas';
+    document.getElementById('hdrSem').textContent    = 'Sem ' + semNums.join(', ');
     document.getElementById('projTitle').textContent = 'Proyección';
     return;
   }
@@ -445,13 +495,41 @@ function updateHeader(){
   var semNum = state.semana > 9999 ? state.semana%100 : state.semana;
   var semAnio = state.semana > 9999 ? Math.floor(state.semana/100) : '';
   document.getElementById('hdrSem').textContent     = (semAnio ? semAnio+' · ' : '')+'Semana '+String(semNum).padStart(2,'0');
-  document.getElementById('hdrTienda').textContent  = state.tienda;
   document.getElementById('projTitle').textContent  = 'Proyección Semana '+(semNum+1);
 }
 
+function getSemanasActivas(){
+  if(!state.semanas_sel || state.semanas_sel.length === 0) return DATA.semanas;
+  return state.semanas_sel;
+}
+
 function getD(){
-  var key = state.semana === 'all' ? String(DATA.semanas[DATA.semanas.length-1]) : String(state.semana);
-  return (DATA.data[state.tienda]&&DATA.data[state.tienda][key]) || {};
+  var sems = getSemanasActivas();
+  var prods = DATA.productos;
+  var merged = {};
+  prods.forEach(function(p){
+    var v12=0,v3=0,emb=0,m3=0,cfbc=0,retail=0;
+    sems.forEach(function(s){
+      var key = String(s);
+      var d = (DATA.data[state.tienda]&&DATA.data[state.tienda][key]&&DATA.data[state.tienda][key][p]) || {};
+      v12   += d.v12   || 0;
+      v3    += d.v3    || 0;
+      emb   += d.emb   || 0;
+      m3    += d.m3    || 0;
+      cfbc  += d.cfbc  || 0;
+      retail+= d.retail|| 0;
+    });
+    var avg = sems.length > 0 ? v3 / sems.length : 0;
+    var merma_ratio = emb > 0 ? m3/emb : 0;
+    var proj = merma_ratio < 1 ? avg/(1-merma_ratio) : avg;
+    merged[p] = {
+      v12: v12, v3: v3, emb: emb, m3: m3,
+      avg: avg, proj: proj,
+      pct_merma: emb > 0 ? Math.round(m3/emb*100) : 0,
+      cfbc: cfbc, retail: retail
+    };
+  });
+  return merged;
 }
 
 function render(){
@@ -524,10 +602,10 @@ function selTiendaT(t){
 
 function renderTienda(){
   var tiendas = DATA.tiendas;
-  var key = String(state.semana);
-  var isAll = (state.semana === 'all');
+  var sems = getSemanasActivas();
+  var isAll = (!state.semanas_sel || state.semanas_sel.length === 0);
 
-  // ── Obtener totales por tienda según si es global o semana específica ──
+  // ── Obtener totales por tienda según semanas activas ──
   var totEmb=0, totCfbc=0, totMerma=0, totRetail=0;
   var tiendaData = [];
 
@@ -540,11 +618,13 @@ function renderTienda(){
       merma  = tot.merma_u    || 0;
       retail = tot.retail_vc  || 0;
     } else {
-      var raw = (DATA.raw_semana && DATA.raw_semana[tienda] && DATA.raw_semana[tienda][key]) || {};
-      emb    = raw.embarque_u || 0;
-      cfbc   = raw.venta_cfbc || 0;
-      merma  = raw.merma_u    || 0;
-      retail = raw.retail_vc  || 0;
+      sems.forEach(function(s){
+        var raw = (DATA.raw_semana && DATA.raw_semana[tienda] && DATA.raw_semana[tienda][String(s)]) || {};
+        emb    += raw.embarque_u || 0;
+        cfbc   += raw.venta_cfbc || 0;
+        merma  += raw.merma_u    || 0;
+        retail += raw.retail_vc  || 0;
+      });
     }
     totEmb+=emb; totCfbc+=cfbc; totMerma+=merma; totRetail+=retail;
     tiendaData.push({tienda:tienda, emb:emb, cfbc:cfbc, merma:merma, retail:retail});
@@ -576,8 +656,8 @@ function renderTienda(){
   });
   mermaRows += '<tr class="total"><td>Total</td><td class="red">'+fmt(totMerma)+'</td><td>$</td><td class="red">'+fmt(totRetail)+'</td><td class="red">100%</td></tr>';
 
-  // ── Semana clave para productos ──
-  var semKeyProd = isAll ? String(DATA.semanas[DATA.semanas.length-1]) : key;
+  // ── Semana clave para productos (última activa) ──
+  var semKeyProd = sems.length > 0 ? String(sems[sems.length-1]) : String(DATA.semanas[DATA.semanas.length-1]);
   var prods = DATA.productos;
 
   // Determinar qué tiendas y productos mostrar en las tablas inferiores
