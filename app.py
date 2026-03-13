@@ -1004,7 +1004,7 @@ function imprimirReporte(){
     'tr.total td{font-weight:700;border-top:1px solid #ddd;background:#f5f5f5}',
     '.red{color:#c00;font-weight:600}.bold{font-weight:700}',
     '@page{margin:10mm}',
-    '@media print{body{padding:0}.aviso{display:none!important}.logo img{filter:brightness(0) invert(1);background:#fff;padding:2px}}',
+    '@media print{body{padding:0}.aviso{display:none!important}.logo img{display:none}}',
     '.aviso{background:#fffbe6;border:1px solid #f0b429;border-radius:6px;',
            'padding:8px 14px;margin-bottom:12px;font-size:.75rem;color:#7a5c00;',
            'display:flex;align-items:center;gap:8px}',
