@@ -583,14 +583,14 @@ function renderTienda(){
         // Global: usar totales acumulados por tienda+producto
         d = (DATA.totales_prod_tienda && DATA.totales_prod_tienda[tSel] && DATA.totales_prod_tienda[tSel][p]) || {};
         var venta  = d.venta_cfbc  || 0;
-        var unid   = d.ventas_u    || 0;
+        var unid   = d.embarque_u  || 0;  // embarque_u = misma fuente que Top Venta UNIDADES
         var mermaU = d.merma_u     || 0;
         var mermaR = d.retail_vc   || 0;
       } else {
         // Semana específica: usar raw_prod_semana (exactamente igual que Top Venta/Merma)
         d = (DATA.raw_prod_semana && DATA.raw_prod_semana[tSel] && DATA.raw_prod_semana[tSel][semKeyProd] && DATA.raw_prod_semana[tSel][semKeyProd][p]) || {};
         var venta  = d.venta_cfbc  || 0;
-        var unid   = d.ventas_u    || 0;
+        var unid   = d.embarque_u  || 0;  // embarque_u = misma fuente que Top Venta UNIDADES
         var mermaU = d.merma_u     || 0;
         var mermaR = d.retail_vc   || 0;
       }
@@ -617,13 +617,13 @@ function renderTienda(){
         if(isAll){
           d = (DATA.totales_prod_tienda && DATA.totales_prod_tienda[t] && DATA.totales_prod_tienda[t][p]) || {};
           ventaSum  += d.venta_cfbc || 0;
-          unidSum   += d.ventas_u   || 0;
+          unidSum   += d.embarque_u || 0;  // embarque_u = misma fuente que Top Venta UNIDADES
           mermaUSum += d.merma_u    || 0;
           mermaRSum += d.retail_vc  || 0;
         } else {
           d = (DATA.raw_prod_semana && DATA.raw_prod_semana[t] && DATA.raw_prod_semana[t][semKeyProd] && DATA.raw_prod_semana[t][semKeyProd][p]) || {};
           ventaSum  += d.venta_cfbc || 0;
-          unidSum   += d.ventas_u   || 0;
+          unidSum   += d.embarque_u || 0;  // embarque_u = misma fuente que Top Venta UNIDADES
           mermaUSum += d.merma_u    || 0;
           mermaRSum += d.retail_vc  || 0;
         }
