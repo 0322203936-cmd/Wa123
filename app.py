@@ -490,7 +490,8 @@ function updateSemLabel(){
 }
 
 function onSemChk(){
-  var chks = document.querySelectorAll('#semDropMenu input[type=checkbox]');
+  // Solo .sem-chk para excluir el checkbox "Seleccionar todas" (sin value → NaN)
+  var chks = document.querySelectorAll('#semDropMenu input[type=checkbox].sem-chk');
   var selected = [];
   chks.forEach(function(c){
     var s = parseInt(c.value);
@@ -502,7 +503,9 @@ function onSemChk(){
       if(row) row.className = 'sem-item';
     }
   });
-  state.semanas_sel = selected;
+  // Si están TODAS seleccionadas → tratar como Global (semanas_sel vacío)
+  var esGlobal = (selected.length === DATA.semanas.length);
+  state.semanas_sel = esGlobal ? [] : selected;
   state.semana = selected.length > 0 ? selected[selected.length-1] : 'all';
   state.tiendaT = null;
   updateSemLabel();
@@ -547,7 +550,15 @@ function updateHeader(){
     return;
   }
   if(sems.length > 1){
-    var semNums = sems.map(function(s){ return s > 9999 ? s%100 : s; });
+    // Incluir año cuando hay semanas de distintos años para evitar "1, 1" duplicados
+    var primerAnio = sems.find(function(s){ return s > 9999 ? Math.floor(s/100) : null; });
+    primerAnio = primerAnio ? Math.floor(primerAnio/100) : null;
+    var multiAnio = sems.some(function(s){ return s > 9999 && Math.floor(s/100) !== primerAnio; });
+    var semNums = sems.map(function(s){
+      var yr = s > 9999 ? Math.floor(s/100) : null;
+      var wk = s > 9999 ? s%100 : s;
+      return (multiAnio && yr) ? yr+'\xb7S'+String(wk).padStart(2,'0') : String(wk).padStart(2,'0');
+    });
     document.getElementById('hdrFecha').textContent  = sems.length + ' semanas seleccionadas';
     document.getElementById('hdrSem').textContent    = 'Sem ' + semNums.join(', ');
     document.getElementById('projTitle').textContent = 'Proyección';
