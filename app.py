@@ -738,10 +738,10 @@ function imprimirReporte(){
     +     '<table><thead><tr><th>Producto</th><th>Embarque</th><th>Merma</th><th>Merma %</th></tr></thead>'
     +     '<tbody>'+tMerma+'</tbody></table></div>'
     +   '<div class="box"><div class="box-hdr">Venta Promedio Semanal</div>'
-    +     '<table><thead><tr><th>Producto</th><th>Venta</th><th>Unidades</th></tr></thead>'
+    +     '<table><thead><tr><th>Producto</th><th>Promedio</th></tr></thead>'
     +     '<tbody>'+tAvg+'</tbody></table></div>'
     +   '<div class="box"><div class="box-hdr">'+projTit+'</div>'
-    +     '<table><thead><tr><th>Merma Producto</th><th>Unidades</th><th>Cantidad</th></tr></thead>'
+    +     '<table><thead><tr><th>Producto</th><th>Proyecci\u00f3n</th></tr></thead>'
     +     '<tbody>'+tProj+'</tbody></table></div>'
     + '</div>'
     // ── SIN footer de fecha ──
