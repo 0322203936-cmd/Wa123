@@ -464,21 +464,10 @@ html,body{height:auto;overflow-y:auto}
       </table>
     </div>
     <div class="box">
-      <div class="box-hdr">Total Inventario por Producto</div>
+      <div class="box-hdr" id="invProductoTitle">Total Inventario por Producto</div>
       <table class="t">
         <thead><tr><th>Producto</th><th>Inventario Total</th></tr></thead>
         <tbody id="tInvProducto"></tbody>
-      </table>
-    </div>
-  </div>
-
-  <!-- Tabla de detalles para inventario -->
-  <div id="viewInventarioDetalle" style="display:none; padding:12px">
-    <div class="box">
-      <div class="box-hdr" id="invDetalleTitle"></div>
-      <table class="t">
-        <thead id="invDetalleThead"></thead>
-        <tbody id="invDetalleBody"></tbody>
       </table>
     </div>
   </div>
@@ -864,7 +853,6 @@ function setView(v){
   document.getElementById('viewProducto').style.display = v==='producto' ? 'grid' : 'none';
   document.getElementById('viewTienda').style.display = v==='tienda' ? 'grid' : 'none';
   document.getElementById('viewInventario').style.display = v==='inventario' ? 'grid' : 'none';
-  document.getElementById('viewInventarioDetalle').style.display = 'none';
   
   // Ocultar filtros de tienda en vista Tienda e Inventario
   var tiendaDropWrap = document.getElementById('tiendaDropWrap');
@@ -1048,22 +1036,16 @@ function renderInventario(){
   var invTienda = DATA.inventario_por_tienda || {};
   var invProducto = DATA.inventario_por_producto || {};
   
-  // Si hay un modo seleccionado (tienda o producto), mostrar detalles
-  if(state.invMode && state.invSelected){
-    renderInventarioDetalle();
-    return;
-  }
-  
-  // Mostrar tablas principales
   document.getElementById('viewInventario').style.display = 'grid';
-  document.getElementById('viewInventarioDetalle').style.display = 'none';
   
   // ── Tabla: Total Inventario por Tienda ──
   var rowsTienda = '';
   var tiendas = Object.keys(invTienda).sort();
   tiendas.forEach(function(t){
     var total = invTienda[t].total || 0;
-    rowsTienda += '<tr onclick="selInvTienda(\''+t.replace(/'/g,"\\'")+'\')" style="cursor:pointer">'
+    var isSelected = (state.invMode === 'tienda' && state.invSelected === t);
+    var rowClass = isSelected ? ' style="background:#e3f2fd;font-weight:700"' : '';
+    rowsTienda += '<tr onclick="selInvTienda(\''+t.replace(/'/g,"\\'")+'\')"'+rowClass+'>'
       + '<td>'+t+'</td>'
       + '<td>'+fmt(total)+'</td>'
       + '</tr>';
@@ -1072,81 +1054,86 @@ function renderInventario(){
   
   // ── Tabla: Total Inventario por Producto ──
   var rowsProducto = '';
-  var productos = Object.keys(invProducto).sort();
-  productos.forEach(function(p){
-    var total = invProducto[p].total || 0;
-    rowsProducto += '<tr onclick="selInvProducto(\''+p.replace(/'/g,"\\'")+'\')" style="cursor:pointer">'
-      + '<td>'+p+'</td>'
-      + '<td>'+fmt(total)+'</td>'
-      + '</tr>';
-  });
+  var productos = [];
+  var title = 'Total Inventario por Producto';
+  
+  if(state.invMode === 'tienda' && state.invSelected){
+    // Filtrar: solo productos de la tienda seleccionada
+    var tienda = state.invSelected;
+    var data = invTienda[tienda];
+    if(data && data.productos){
+      productos = Object.keys(data.productos).sort();
+      productos.forEach(function(p){
+        var inv = data.productos[p] || 0;
+        rowsProducto += '<tr onclick="selInvProducto(\''+p.replace(/'/g,"\\'")+'\')">'
+          + '<td>'+p+'</td>'
+          + '<td>'+fmt(inv)+'</td>'
+          + '</tr>';
+      });
+      // Total
+      rowsProducto += '<tr class="total"><td>TOTAL</td><td>'+fmt(data.total)+'</td></tr>';
+    }
+    title = 'Inventario en: ' + tienda + ' <button onclick="limpiarInvFiltro()" style="margin-left:8px;padding:2px 6px;background:#999;color:white;border:none;border-radius:3px;cursor:pointer;font-size:.65rem">✕</button>';
+  } else if(state.invMode === 'producto' && state.invSelected){
+    // Filtrar: solo tiendas que tienen el producto seleccionado
+    var producto = state.invSelected;
+    var data = invProducto[producto];
+    if(data && data.tiendas){
+      var tiendasConProd = Object.keys(data.tiendas).sort();
+      tiendasConProd.forEach(function(t){
+        var inv = data.tiendas[t] || 0;
+        rowsProducto += '<tr>'
+          + '<td>'+t+'</td>'
+          + '<td>'+fmt(inv)+'</td>'
+          + '</tr>';
+      });
+      // Total
+      rowsProducto += '<tr class="total"><td>TOTAL</td><td>'+fmt(data.total)+'</td></tr>';
+    }
+    title = 'Tiendas con: ' + producto + ' <button onclick="limpiarInvFiltro()" style="margin-left:8px;padding:2px 6px;background:#999;color:white;border:none;border-radius:3px;cursor:pointer;font-size:.65rem">✕</button>';
+  } else {
+    // Sin filtro: mostrar todos los productos
+    productos = Object.keys(invProducto).sort();
+    productos.forEach(function(p){
+      var total = invProducto[p].total || 0;
+      var isSelected = (state.invMode === 'producto' && state.invSelected === p);
+      var rowClass = isSelected ? ' style="background:#e3f2fd;font-weight:700"' : '';
+      rowsProducto += '<tr onclick="selInvProducto(\''+p.replace(/'/g,"\\'")+'\')"'+rowClass+'>'
+        + '<td>'+p+'</td>'
+        + '<td>'+fmt(total)+'</td>'
+        + '</tr>';
+    });
+  }
+  
+  document.getElementById('invProductoTitle').innerHTML = title;
   document.getElementById('tInvProducto').innerHTML = rowsProducto;
 }
 
 function selInvTienda(t){
-  state.invMode = 'tienda';
-  state.invSelected = t;
-  renderInventarioDetalle();
+  // Si ya está seleccionada, deseleccionar
+  if(state.invMode === 'tienda' && state.invSelected === t){
+    state.invMode = null;
+    state.invSelected = null;
+  } else {
+    state.invMode = 'tienda';
+    state.invSelected = t;
+  }
+  renderInventario();
 }
 
 function selInvProducto(p){
-  state.invMode = 'producto';
-  state.invSelected = p;
-  renderInventarioDetalle();
-}
-
-function renderInventarioDetalle(){
-  document.getElementById('viewInventario').style.display = 'none';
-  document.getElementById('viewInventarioDetalle').style.display = 'block';
-  
-  var title = '';
-  var thead = '';
-  var rows = '';
-  
-  if(state.invMode === 'tienda'){
-    // Mostrar productos de esta tienda
-    var tienda = state.invSelected;
-    var data = DATA.inventario_por_tienda[tienda];
-    if(!data){ return; }
-    
-    title = 'Inventario en Tienda: ' + tienda;
-    thead = '<tr><th>Producto</th><th>Inventario</th></tr>';
-    
-    var productos = Object.keys(data.productos || {}).sort();
-    productos.forEach(function(p){
-      var inv = data.productos[p] || 0;
-      rows += '<tr><td>'+p+'</td><td>'+fmt(inv)+'</td></tr>';
-    });
-    
-    // Fila de total
-    rows += '<tr class="total"><td>TOTAL</td><td>'+fmt(data.total)+'</td></tr>';
-    
-  } else if(state.invMode === 'producto'){
-    // Mostrar tiendas que tienen este producto
-    var producto = state.invSelected;
-    var data = DATA.inventario_por_producto[producto];
-    if(!data){ return; }
-    
-    title = 'Inventario del Producto: ' + producto;
-    thead = '<tr><th>Tienda</th><th>Inventario</th></tr>';
-    
-    var tiendas = Object.keys(data.tiendas || {}).sort();
-    tiendas.forEach(function(t){
-      var inv = data.tiendas[t] || 0;
-      rows += '<tr><td>'+t+'</td><td>'+fmt(inv)+'</td></tr>';
-    });
-    
-    // Fila de total
-    rows += '<tr class="total"><td>TOTAL</td><td>'+fmt(data.total)+'</td></tr>';
+  // Si ya está seleccionado, deseleccionar
+  if(state.invMode === 'producto' && state.invSelected === p){
+    state.invMode = null;
+    state.invSelected = null;
+  } else {
+    state.invMode = 'producto';
+    state.invSelected = p;
   }
-  
-  document.getElementById('invDetalleTitle').innerHTML = title 
-    + ' <button onclick="volverInventario()" style="float:right;padding:2px 8px;background:#0071ce;color:white;border:none;border-radius:3px;cursor:pointer;font-size:.7rem">← Volver</button>';
-  document.getElementById('invDetalleThead').innerHTML = thead;
-  document.getElementById('invDetalleBody').innerHTML = rows;
+  renderInventario();
 }
 
-function volverInventario(){
+function limpiarInvFiltro(){
   state.invMode = null;
   state.invSelected = null;
   renderInventario();
