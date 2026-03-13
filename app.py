@@ -268,10 +268,10 @@ select{border:1px solid #bbb;border-radius:4px;padding:3px 7px;font-size:.72rem;
 .chip-wrap{display:flex;flex-wrap:wrap;gap:4px;flex:1}
 .chip{padding:2px 9px;border-radius:12px;font-size:.67rem;cursor:pointer;border:1px solid #bbb;color:#333;background:#fff;transition:.15s}
 .chip:hover{border-color:#0071ce;color:#0071ce}
-.chk-label{display:inline-flex;align-items:center;gap:3px;font-size:.67rem;color:#333;cursor:pointer;padding:2px 6px;border:1px solid #bbb;border-radius:4px;background:#fff;white-space:nowrap}
-.chk-label:hover{border-color:#0071ce;color:#0071ce}
-.chk-label input{accent-color:#0071ce;cursor:pointer;width:12px;height:12px}
-.chk-label.on{background:#e8f0fe;border-color:#0071ce;color:#0071ce;font-weight:600}
+.sem-item{display:flex;align-items:center;gap:6px;padding:4px 10px;font-size:.72rem;cursor:pointer;color:#333;white-space:nowrap}
+.sem-item:hover{background:#f0f7ff}
+.sem-item.on{background:#e8f0fe;color:#0071ce;font-weight:600}
+.sem-item input{accent-color:#0071ce;cursor:pointer;width:13px;height:13px;flex-shrink:0}
 .grid{display:grid;grid-template-columns:1fr 1fr;padding:8px 16px;gap:8px;width:100%;box-sizing:border-box}
 .box{border:1px solid #bbb;border-radius:4px;overflow:visible}
 .box-hdr{background:#f0f0f0;border-bottom:1px solid #bbb;padding:4px 10px;text-align:center;font-size:.74rem;font-weight:700;color:#111}
@@ -327,7 +327,13 @@ html,body{height:auto;overflow-y:auto}
 
   <div class="ctrl">
     <label>Semana:</label>
-    <div id="semChkWrap" style="display:flex;flex-wrap:wrap;gap:4px;max-width:600px"></div>
+    <div style="position:relative;display:inline-block" id="semDropWrap">
+      <button id="semDropBtn" onclick="toggleSemDrop()" style="border:1px solid #bbb;border-radius:4px;padding:3px 24px 3px 7px;font-size:.72rem;cursor:pointer;background:#fff;min-width:160px;text-align:left;position:relative">
+        <span id="semDropLabel">— Seleccionar semanas —</span>
+        <span style="position:absolute;right:6px;top:50%;transform:translateY(-50%);font-size:.6rem">▼</span>
+      </button>
+      <div id="semDropMenu" style="display:none;position:absolute;top:100%;left:0;z-index:999;background:#fff;border:1px solid #bbb;border-radius:4px;box-shadow:0 3px 10px rgba(0,0,0,.15);min-width:200px;max-height:260px;overflow-y:auto;padding:4px 0"></div>
+    </div>
     <label>Tienda:</label>
     <div class="chip-wrap" id="chips"></div>
     <div style="margin-top:12px; display:flex; gap:8px;">
@@ -395,55 +401,79 @@ function init(){
   window.onerror = function(m,s,l){
     document.body.innerHTML='<p style="padding:20px;color:red">Error: '+m+' (línea '+l+')</p>';
   };
-  var wrap = document.getElementById('semChkWrap');
+  var menu = document.getElementById('semDropMenu');
   DATA.semanas.forEach(function(s){
     var yr = Math.floor(s/100), wk = s%100;
-    var label = (yr >= 2000) ? yr+' · S'+String(wk).padStart(2,'0') : 'S'+String(s).padStart(2,'0');
+    var labelTxt = (yr >= 2000) ? yr+' · Semana '+String(wk).padStart(2,'0') : 'Semana '+String(s).padStart(2,'0');
     var isLast = (s === DATA.semanas[DATA.semanas.length-1]);
-    var lbl = document.createElement('label');
-    lbl.className = 'chk-label' + (isLast ? ' on' : '');
-    lbl.id = 'lbl-sem-'+s;
+    var row = document.createElement('label');
+    row.className = 'sem-item' + (isLast ? ' on' : '');
+    row.id = 'sem-row-'+s;
     var chk = document.createElement('input');
     chk.type = 'checkbox';
     chk.value = s;
     chk.checked = isLast;
     chk.onchange = function(){ onSemChk(); };
-    lbl.appendChild(chk);
-    lbl.appendChild(document.createTextNode(label));
-    wrap.appendChild(lbl);
+    row.appendChild(chk);
+    row.appendChild(document.createTextNode(labelTxt));
+    menu.appendChild(row);
+  });
+  // Cerrar dropdown al clicar fuera
+  document.addEventListener('click', function(e){
+    var wrap = document.getElementById('semDropWrap');
+    if(wrap && !wrap.contains(e.target)) closeSemDrop();
   });
   state.semana = DATA.semanas[DATA.semanas.length-1];
   state.semanas_sel = [state.semana];
   state.tienda = DATA.tiendas[0];
-  buildChips(); updateHeader(); render();
+  buildChips(); updateHeader(); updateSemLabel(); render();
   document.getElementById('loader').style.display = 'none';
   document.getElementById('app').style.display    = 'block';
 }
 
+function toggleSemDrop(){
+  var menu = document.getElementById('semDropMenu');
+  menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+}
+function closeSemDrop(){
+  document.getElementById('semDropMenu').style.display = 'none';
+}
+
+function updateSemLabel(){
+  var sel = state.semanas_sel;
+  var lbl = document.getElementById('semDropLabel');
+  if(!sel || sel.length === 0){
+    lbl.textContent = '— Todas las semanas —';
+  } else if(sel.length === 1){
+    var s = sel[0], yr = Math.floor(s/100), wk = s%100;
+    lbl.textContent = (yr >= 2000) ? yr+' · Semana '+String(wk).padStart(2,'0') : 'Semana '+String(s).padStart(2,'0');
+  } else {
+    lbl.textContent = sel.length+' semanas seleccionadas';
+  }
+}
+
 function onSemChk(){
-  var chks = document.querySelectorAll('#semChkWrap input[type=checkbox]');
+  var chks = document.querySelectorAll('#semDropMenu input[type=checkbox]');
   var selected = [];
   chks.forEach(function(c){
     var s = parseInt(c.value);
-    var lbl = document.getElementById('lbl-sem-'+s);
+    var row = document.getElementById('sem-row-'+s);
     if(c.checked){
       selected.push(s);
-      if(lbl) lbl.className = 'chk-label on';
+      if(row) row.className = 'sem-item on';
     } else {
-      if(lbl) lbl.className = 'chk-label';
+      if(row) row.className = 'sem-item';
     }
   });
   state.semanas_sel = selected;
   state.semana = selected.length > 0 ? selected[selected.length-1] : 'all';
   state.tiendaT = null;
+  updateSemLabel();
   updateHeader();
   if(state.view==='producto') render(); else renderTienda();
 }
 
-function onSem(sel){
-  // fallback por compatibilidad
-  onSemChk();
-}
+function onSem(sel){ onSemChk(); }
 
 function buildChips(){
   document.getElementById('chips').innerHTML = DATA.tiendas.map(function(t){
