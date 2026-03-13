@@ -79,6 +79,13 @@ def cargar_datos(url: str = "") -> dict:
         try: idx_retail_vc = col(_n); break
         except: pass
 
+    # Columna de inventario actual
+    idx_inventario = None
+    for _n in ['Cantidad Actual en Existentes de la tienda', 'Cantidad Actual en Existentes',
+               'Cantidad Actual', 'Inventario Actual', 'Existentes']:
+        try: idx_inventario = col(_n); break
+        except: pass
+
     # Advertir si columnas clave no se encontraron
     if idx_retail_vc is None:
         import streamlit as _st
@@ -86,6 +93,13 @@ def cargar_datos(url: str = "") -> dict:
             f"⚠️ No se encontró columna 'Retail VC Tienda'. "
             f"Columnas disponibles: {[h for h in headers if h and 'VC' in h or 'Retail' in h or 'retail' in h.lower() if h]}\n"
             f"Todos los encabezados: {[h for h in headers if h]}"
+        )
+    
+    if idx_inventario is None:
+        import streamlit as _st
+        _st.warning(
+            f"⚠️ No se encontró columna 'Cantidad Actual en Existentes de la tienda'. "
+            f"Inventario no estará disponible. Columnas disponibles: {[h for h in headers if h]}"
         )
 
     records = []
@@ -134,6 +148,7 @@ def cargar_datos(url: str = "") -> dict:
             'merma_u':    sv(row[idx_merma_vc]),
             'venta_cfbc': sv(row[idx_venta_cfbc]) if idx_venta_cfbc is not None else 0,
             'retail_vc':  sv(row[idx_retail_vc]) if idx_retail_vc is not None else 0,
+            'inventario': sv(row[idx_inventario]) if idx_inventario is not None else 0,
         })
 
     # Inferir año para filas sin fecha usando el año más frecuente del mismo número de semana
@@ -163,6 +178,7 @@ def cargar_datos(url: str = "") -> dict:
         by_stp[r['semana']][r['tienda']][r['producto']]['merma_u']    += r['merma_u']
         by_stp[r['semana']][r['tienda']][r['producto']]['venta_cfbc'] += r['venta_cfbc']
         by_stp[r['semana']][r['tienda']][r['producto']]['retail_vc']  += r['retail_vc']
+        by_stp[r['semana']][r['tienda']][r['producto']]['inventario'] += r['inventario']
 
     # Fecha real del Excel por semana
     fecha_por_semana = {}
@@ -211,15 +227,18 @@ def cargar_datos(url: str = "") -> dict:
         totales_tienda[r['tienda']]['venta_cfbc'] += r['venta_cfbc']
         totales_tienda[r['tienda']]['merma_u']    += r['merma_u']
         totales_tienda[r['tienda']]['retail_vc']  += r['retail_vc']
+        totales_tienda[r['tienda']]['inventario'] += r['inventario']
         raw_semana[r['tienda']][r['semana']]['embarque_u'] += r['embarque_u']
         raw_semana[r['tienda']][r['semana']]['venta_cfbc'] += r['venta_cfbc']
         raw_semana[r['tienda']][r['semana']]['merma_u']    += r['merma_u']
         raw_semana[r['tienda']][r['semana']]['retail_vc']  += r['retail_vc']
+        raw_semana[r['tienda']][r['semana']]['inventario'] += r['inventario']
         totales_prod_tienda[r['tienda']][r['producto']]['embarque_u'] += r['embarque_u']
         totales_prod_tienda[r['tienda']][r['producto']]['venta_cfbc'] += r['venta_cfbc']
         totales_prod_tienda[r['tienda']][r['producto']]['merma_u']    += r['merma_u']
         totales_prod_tienda[r['tienda']][r['producto']]['retail_vc']  += r['retail_vc']
         totales_prod_tienda[r['tienda']][r['producto']]['ventas_u']   += r['ventas_u']
+        totales_prod_tienda[r['tienda']][r['producto']]['inventario'] += r['inventario']
 
     # raw por tienda+semana+producto (exactamente la semana seleccionada)
     raw_prod_semana = {}
@@ -229,14 +248,35 @@ def cargar_datos(url: str = "") -> dict:
             raw_prod_semana[t][str(s)] = {}
             for p in productos:
                 d = by_stp[s][t][p]
-                if any(d[k] for k in ['ventas_u','venta_cfbc','merma_u','retail_vc','embarque_u']):
+                if any(d[k] for k in ['ventas_u','venta_cfbc','merma_u','retail_vc','embarque_u','inventario']):
                     raw_prod_semana[t][str(s)][p] = {
                         'ventas_u':   round(d['ventas_u']),
                         'venta_cfbc': round(d['venta_cfbc']),
                         'merma_u':    round(d['merma_u']),
                         'retail_vc':  round(d['retail_vc']),
                         'embarque_u': round(d['embarque_u']),
+                        'inventario': round(d['inventario']),
                     }
+
+    # Agregaciones de inventario por tienda (suma de todos los productos)
+    inventario_por_tienda = {}
+    for t in tiendas:
+        total_inv = sum(totales_prod_tienda[t][p].get('inventario', 0) for p in productos)
+        inventario_por_tienda[t] = {
+            'total': round(total_inv),
+            'productos': {p: round(totales_prod_tienda[t][p].get('inventario', 0)) 
+                         for p in productos if totales_prod_tienda[t][p].get('inventario', 0) > 0}
+        }
+    
+    # Agregaciones de inventario por producto (suma de todas las tiendas)
+    inventario_por_producto = {}
+    for p in productos:
+        total_inv = sum(totales_prod_tienda[t][p].get('inventario', 0) for t in tiendas)
+        inventario_por_producto[p] = {
+            'total': round(total_inv),
+            'tiendas': {t: round(totales_prod_tienda[t][p].get('inventario', 0)) 
+                       for t in tiendas if totales_prod_tienda[t][p].get('inventario', 0) > 0}
+        }
 
     return {
         'semanas':           semanas,
@@ -248,6 +288,8 @@ def cargar_datos(url: str = "") -> dict:
         'raw_semana':        {t: {str(s): dict(v) for s, v in sv.items()} for t, sv in raw_semana.items()},
         'raw_prod_semana':   raw_prod_semana,
         'totales_prod_tienda': {t: {p: dict(v) for p, v in pd.items()} for t, pd in totales_prod_tienda.items()},
+        'inventario_por_tienda': inventario_por_tienda,
+        'inventario_por_producto': inventario_por_producto,
     }
 
 try:
@@ -300,6 +342,7 @@ table.t tr.total td{font-weight:700;border-top:1px solid #ddd;background:#f5f5f5
 .red{color:#c00;font-weight:600}
 .bold{font-weight:700}
 #viewTienda table.t tr:not(.total):hover td{background:#f0f7ff;cursor:pointer}
+#viewInventario table.t tr:hover td{background:#f0f7ff;cursor:pointer}
 #viewTienda{overflow:visible}
 html,body{height:auto;overflow-y:auto}
 #app{height:auto;overflow:visible}
@@ -361,6 +404,7 @@ html,body{height:auto;overflow-y:auto}
     <div style="margin-top:12px; display:flex; gap:8px;">
       <button onclick="setView('producto')" id="btnProd" style="padding:6px 12px; background:#0071ce; color:white; border:none; border-radius:4px; cursor:pointer; font-weight:600;">📊 Producto</button>
       <button onclick="setView('tienda')" id="btnTiend" style="padding:6px 12px; background:#ccc; color:#333; border:none; border-radius:4px; cursor:pointer; font-weight:600;">🏪 Tienda</button>
+      <button onclick="setView('inventario')" id="btnInv" style="padding:6px 12px; background:#ccc; color:#333; border:none; border-radius:4px; cursor:pointer; font-weight:600;">📦 Inventario Actual</button>
     </div>
   </div>
 
@@ -409,11 +453,40 @@ html,body{height:auto;overflow-y:auto}
       <tbody id="tProjT"></tbody></table>
     </div>
   </div>
+
+  <!-- Vista Inventario Actual -->
+  <div class="grid" id="viewInventario" style="display:none">
+    <div class="box">
+      <div class="box-hdr">Total Inventario por Tienda</div>
+      <table class="t">
+        <thead><tr><th>Tienda</th><th>Inventario Total</th></tr></thead>
+        <tbody id="tInvTienda"></tbody>
+      </table>
+    </div>
+    <div class="box">
+      <div class="box-hdr">Total Inventario por Producto</div>
+      <table class="t">
+        <thead><tr><th>Producto</th><th>Inventario Total</th></tr></thead>
+        <tbody id="tInvProducto"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Tabla de detalles para inventario -->
+  <div id="viewInventarioDetalle" style="display:none; padding:12px">
+    <div class="box">
+      <div class="box-hdr" id="invDetalleTitle"></div>
+      <table class="t">
+        <thead id="invDetalleThead"></thead>
+        <tbody id="invDetalleBody"></tbody>
+      </table>
+    </div>
+  </div>
 </div>
 
 <script>
 var DATA = JSON.parse(atob('__DATA_JSON__'));
-var state = { semana: null, semanas_sel: null, tienda: null, view: 'producto', tiendaT: null };
+var state = { semana: null, semanas_sel: null, tienda: null, view: 'producto', tiendaT: null, invMode: null, invSelected: null };
 var DIAS  = ['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
 var MESES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
 
@@ -786,13 +859,17 @@ function setView(v){
   document.getElementById('btnProd').style.color = v==='producto' ? 'white' : '#333';
   document.getElementById('btnTiend').style.background = v==='tienda' ? '#0071ce' : '#ccc';
   document.getElementById('btnTiend').style.color = v==='tienda' ? 'white' : '#333';
+  document.getElementById('btnInv').style.background = v==='inventario' ? '#0071ce' : '#ccc';
+  document.getElementById('btnInv').style.color = v==='inventario' ? 'white' : '#333';
   document.getElementById('viewProducto').style.display = v==='producto' ? 'grid' : 'none';
   document.getElementById('viewTienda').style.display = v==='tienda' ? 'grid' : 'none';
+  document.getElementById('viewInventario').style.display = v==='inventario' ? 'grid' : 'none';
+  document.getElementById('viewInventarioDetalle').style.display = 'none';
   
-  // Ocultar filtros de tienda en vista Tienda
+  // Ocultar filtros de tienda en vista Tienda e Inventario
   var tiendaDropWrap = document.getElementById('tiendaDropWrap');
   var tiendaLabel = Array.from(document.querySelectorAll('.ctrl label')).find(el => el.textContent === 'Tienda:');
-  if(v==='tienda'){
+  if(v==='tienda' || v==='inventario'){
     if(tiendaDropWrap) tiendaDropWrap.style.display = 'none';
     if(tiendaLabel) tiendaLabel.style.display = 'none';
   } else {
@@ -801,6 +878,7 @@ function setView(v){
   }
   
   if(v==='tienda'){ state.tiendaT = null; renderTienda(); }
+  else if(v==='inventario'){ state.invMode = null; state.invSelected = null; renderInventario(); }
   else render();
 }
 
@@ -963,6 +1041,115 @@ function renderTienda(){
   document.getElementById('tMermaT').innerHTML = mermaRows;
   document.getElementById('tAvgT').innerHTML   = avgRows;
   document.getElementById('tProjT').innerHTML  = projRows;
+}
+
+// ─── INVENTARIO ─────────────────────────────────────────────────────────────
+function renderInventario(){
+  var invTienda = DATA.inventario_por_tienda || {};
+  var invProducto = DATA.inventario_por_producto || {};
+  
+  // Si hay un modo seleccionado (tienda o producto), mostrar detalles
+  if(state.invMode && state.invSelected){
+    renderInventarioDetalle();
+    return;
+  }
+  
+  // Mostrar tablas principales
+  document.getElementById('viewInventario').style.display = 'grid';
+  document.getElementById('viewInventarioDetalle').style.display = 'none';
+  
+  // ── Tabla: Total Inventario por Tienda ──
+  var rowsTienda = '';
+  var tiendas = Object.keys(invTienda).sort();
+  tiendas.forEach(function(t){
+    var total = invTienda[t].total || 0;
+    rowsTienda += '<tr onclick="selInvTienda(\''+t.replace(/'/g,"\\'")+'\')" style="cursor:pointer">'
+      + '<td>'+t+'</td>'
+      + '<td>'+fmt(total)+'</td>'
+      + '</tr>';
+  });
+  document.getElementById('tInvTienda').innerHTML = rowsTienda;
+  
+  // ── Tabla: Total Inventario por Producto ──
+  var rowsProducto = '';
+  var productos = Object.keys(invProducto).sort();
+  productos.forEach(function(p){
+    var total = invProducto[p].total || 0;
+    rowsProducto += '<tr onclick="selInvProducto(\''+p.replace(/'/g,"\\'")+'\')" style="cursor:pointer">'
+      + '<td>'+p+'</td>'
+      + '<td>'+fmt(total)+'</td>'
+      + '</tr>';
+  });
+  document.getElementById('tInvProducto').innerHTML = rowsProducto;
+}
+
+function selInvTienda(t){
+  state.invMode = 'tienda';
+  state.invSelected = t;
+  renderInventarioDetalle();
+}
+
+function selInvProducto(p){
+  state.invMode = 'producto';
+  state.invSelected = p;
+  renderInventarioDetalle();
+}
+
+function renderInventarioDetalle(){
+  document.getElementById('viewInventario').style.display = 'none';
+  document.getElementById('viewInventarioDetalle').style.display = 'block';
+  
+  var title = '';
+  var thead = '';
+  var rows = '';
+  
+  if(state.invMode === 'tienda'){
+    // Mostrar productos de esta tienda
+    var tienda = state.invSelected;
+    var data = DATA.inventario_por_tienda[tienda];
+    if(!data){ return; }
+    
+    title = 'Inventario en Tienda: ' + tienda;
+    thead = '<tr><th>Producto</th><th>Inventario</th></tr>';
+    
+    var productos = Object.keys(data.productos || {}).sort();
+    productos.forEach(function(p){
+      var inv = data.productos[p] || 0;
+      rows += '<tr><td>'+p+'</td><td>'+fmt(inv)+'</td></tr>';
+    });
+    
+    // Fila de total
+    rows += '<tr class="total"><td>TOTAL</td><td>'+fmt(data.total)+'</td></tr>';
+    
+  } else if(state.invMode === 'producto'){
+    // Mostrar tiendas que tienen este producto
+    var producto = state.invSelected;
+    var data = DATA.inventario_por_producto[producto];
+    if(!data){ return; }
+    
+    title = 'Inventario del Producto: ' + producto;
+    thead = '<tr><th>Tienda</th><th>Inventario</th></tr>';
+    
+    var tiendas = Object.keys(data.tiendas || {}).sort();
+    tiendas.forEach(function(t){
+      var inv = data.tiendas[t] || 0;
+      rows += '<tr><td>'+t+'</td><td>'+fmt(inv)+'</td></tr>';
+    });
+    
+    // Fila de total
+    rows += '<tr class="total"><td>TOTAL</td><td>'+fmt(data.total)+'</td></tr>';
+  }
+  
+  document.getElementById('invDetalleTitle').innerHTML = title 
+    + ' <button onclick="volverInventario()" style="float:right;padding:2px 8px;background:#0071ce;color:white;border:none;border-radius:3px;cursor:pointer;font-size:.7rem">← Volver</button>';
+  document.getElementById('invDetalleThead').innerHTML = thead;
+  document.getElementById('invDetalleBody').innerHTML = rows;
+}
+
+function volverInventario(){
+  state.invMode = null;
+  state.invSelected = null;
+  renderInventario();
 }
 
 // ─── IMPRIMIR ───────────────────────────────────────────────────────────────
