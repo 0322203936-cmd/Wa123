@@ -702,13 +702,20 @@ function renderTienda(){
     var totVenta=0, totUnid=0, totMermaU=0, totMermaR=0;
     // Construir array con datos por producto
     var prodItems = prods.map(function(p){
-      var d;
       if(isAll){
-        d = (DATA.totales_prod_tienda && DATA.totales_prod_tienda[tSel] && DATA.totales_prod_tienda[tSel][p]) || {};
+        var d = (DATA.totales_prod_tienda && DATA.totales_prod_tienda[tSel] && DATA.totales_prod_tienda[tSel][p]) || {};
+        return { p:p, venta:d.venta_cfbc||0, unid:d.embarque_u||0, mermaU:d.merma_u||0, mermaR:d.retail_vc||0 };
       } else {
-        d = (DATA.raw_prod_semana && DATA.raw_prod_semana[tSel] && DATA.raw_prod_semana[tSel][semKeyProd] && DATA.raw_prod_semana[tSel][semKeyProd][p]) || {};
+        var venta=0, unid=0, mermaU=0, mermaR=0;
+        sems.forEach(function(s){
+          var dr = (DATA.raw_prod_semana && DATA.raw_prod_semana[tSel] && DATA.raw_prod_semana[tSel][String(s)] && DATA.raw_prod_semana[tSel][String(s)][p]) || {};
+          venta  += dr.venta_cfbc||0;
+          unid   += dr.embarque_u||0;
+          mermaU += dr.merma_u||0;
+          mermaR += dr.retail_vc||0;
+        });
+        return { p:p, venta:venta, unid:unid, mermaU:mermaU, mermaR:mermaR };
       }
-      return { p:p, venta:d.venta_cfbc||0, unid:d.embarque_u||0, mermaU:d.merma_u||0, mermaR:d.retail_vc||0 };
     });
     prodItems.forEach(function(o){ totVenta+=o.venta; totUnid+=o.unid; totMermaU+=o.mermaU; totMermaR+=o.mermaR; });
     // Venta: ordenar por venta desc
@@ -743,11 +750,13 @@ function renderTienda(){
           mermaUSum += d.merma_u    || 0;
           mermaRSum += d.retail_vc  || 0;
         } else {
-          d = (DATA.raw_prod_semana && DATA.raw_prod_semana[t] && DATA.raw_prod_semana[t][semKeyProd] && DATA.raw_prod_semana[t][semKeyProd][p]) || {};
-          ventaSum  += d.venta_cfbc || 0;
-          unidSum   += d.embarque_u || 0;
-          mermaUSum += d.merma_u    || 0;
-          mermaRSum += d.retail_vc  || 0;
+          sems.forEach(function(s){
+            var dr = (DATA.raw_prod_semana && DATA.raw_prod_semana[t] && DATA.raw_prod_semana[t][String(s)] && DATA.raw_prod_semana[t][String(s)][p]) || {};
+            ventaSum  += dr.venta_cfbc || 0;
+            unidSum   += dr.embarque_u || 0;
+            mermaUSum += dr.merma_u    || 0;
+            mermaRSum += dr.retail_vc  || 0;
+          });
         }
       });
       return { p:p, venta:ventaSum, unid:unidSum, mermaU:mermaUSum, mermaR:mermaRSum };
