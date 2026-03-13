@@ -188,6 +188,8 @@ def cargar_datos(url: str = "") -> dict:
     totales_tienda = defaultdict(lambda: defaultdict(float))
     # Totales crudos por tienda+semana — para filtrar por semana específica
     raw_semana = defaultdict(lambda: defaultdict(lambda: defaultdict(float)))
+    # Totales crudos por tienda+semana+producto — para cuadrar tablas inferiores con superiores
+    totales_prod_tienda = defaultdict(lambda: defaultdict(lambda: defaultdict(float)))
     for r in records:
         totales_tienda[r['tienda']]['embarque_u'] += r['embarque_u']
         totales_tienda[r['tienda']]['venta_cfbc'] += r['venta_cfbc']
@@ -197,15 +199,39 @@ def cargar_datos(url: str = "") -> dict:
         raw_semana[r['tienda']][r['semana']]['venta_cfbc'] += r['venta_cfbc']
         raw_semana[r['tienda']][r['semana']]['merma_u']    += r['merma_u']
         raw_semana[r['tienda']][r['semana']]['retail_vc']  += r['retail_vc']
+        totales_prod_tienda[r['tienda']][r['producto']]['embarque_u'] += r['embarque_u']
+        totales_prod_tienda[r['tienda']][r['producto']]['venta_cfbc'] += r['venta_cfbc']
+        totales_prod_tienda[r['tienda']][r['producto']]['merma_u']    += r['merma_u']
+        totales_prod_tienda[r['tienda']][r['producto']]['retail_vc']  += r['retail_vc']
+        totales_prod_tienda[r['tienda']][r['producto']]['ventas_u']   += r['ventas_u']
+
+    # raw por tienda+semana+producto (exactamente la semana seleccionada)
+    raw_prod_semana = {}
+    for t in tiendas:
+        raw_prod_semana[t] = {}
+        for s in semanas:
+            raw_prod_semana[t][str(s)] = {}
+            for p in productos:
+                d = by_stp[s][t][p]
+                if any(d[k] for k in ['ventas_u','venta_cfbc','merma_u','retail_vc','embarque_u']):
+                    raw_prod_semana[t][str(s)][p] = {
+                        'ventas_u':   round(d['ventas_u']),
+                        'venta_cfbc': round(d['venta_cfbc']),
+                        'merma_u':    round(d['merma_u']),
+                        'retail_vc':  round(d['retail_vc']),
+                        'embarque_u': round(d['embarque_u']),
+                    }
 
     return {
-        'semanas':          semanas,
-        'tiendas':          tiendas,
-        'productos':        productos,
-        'fecha_por_semana': fecha_por_semana,
-        'data':             {t: {str(s): v for s, v in sv2.items()} for t, sv2 in result.items()},
-        'totales_tienda':   {t: dict(v) for t, v in totales_tienda.items()},
-        'raw_semana':       {t: {str(s): dict(v) for s, v in sv.items()} for t, sv in raw_semana.items()},
+        'semanas':           semanas,
+        'tiendas':           tiendas,
+        'productos':         productos,
+        'fecha_por_semana':  fecha_por_semana,
+        'data':              {t: {str(s): v for s, v in sv2.items()} for t, sv2 in result.items()},
+        'totales_tienda':    {t: dict(v) for t, v in totales_tienda.items()},
+        'raw_semana':        {t: {str(s): dict(v) for s, v in sv.items()} for t, sv in raw_semana.items()},
+        'raw_prod_semana':   raw_prod_semana,
+        'totales_prod_tienda': {t: {p: dict(v) for p, v in pd.items()} for t, pd in totales_prod_tienda.items()},
     }
 
 try:
@@ -543,62 +569,74 @@ function renderTienda(){
   var avgRows='', projRows='';
 
   if(state.tiendaT){
-    // Modo: tienda seleccionada — mostrar productos de esa tienda
+    // Modo: tienda seleccionada — mostrar productos de esa tienda con datos RAW (misma fuente que Top Venta/Merma)
     var tSel = state.tiendaT;
     var tName = tSel.replace('SC ','');
-    document.getElementById('avgTTitle').textContent  = 'Venta Promedio — '+tName;
-    document.getElementById('projTTitle').textContent = 'Merma Últ. 3 Sem — '+tName;
+    document.getElementById('avgTTitle').textContent  = 'Venta — '+tName;
+    document.getElementById('projTTitle').textContent = 'Merma — '+tName;
 
     var totVenta=0, totUnid=0, totMermaU=0, totMermaR=0;
     prods.forEach(function(p){
-      var d = (DATA.data[tSel]&&DATA.data[tSel][semKeyProd]&&DATA.data[tSel][semKeyProd][p]) || {};
-      var venta  = d.cfbc  || 0;   // Venta CFBC
-      var unid   = d.avg   || 0;   // Promedio unidades
-      var mermaU = d.m3    || 0;   // Merma unidades
-      var mermaR = d.retail|| 0;   // Retail VC (cantidad $)
+      var d;
+      if(isAll){
+        // Global: usar totales acumulados por tienda+producto
+        d = (DATA.totales_prod_tienda && DATA.totales_prod_tienda[tSel] && DATA.totales_prod_tienda[tSel][p]) || {};
+        var venta  = d.venta_cfbc  || 0;
+        var unid   = d.ventas_u    || 0;
+        var mermaU = d.merma_u     || 0;
+        var mermaR = d.retail_vc   || 0;
+      } else {
+        // Semana específica: usar raw_prod_semana (exactamente igual que Top Venta/Merma)
+        d = (DATA.raw_prod_semana && DATA.raw_prod_semana[tSel] && DATA.raw_prod_semana[tSel][semKeyProd] && DATA.raw_prod_semana[tSel][semKeyProd][p]) || {};
+        var venta  = d.venta_cfbc  || 0;
+        var unid   = d.ventas_u    || 0;
+        var mermaU = d.merma_u     || 0;
+        var mermaR = d.retail_vc   || 0;
+      }
       totVenta+=venta; totUnid+=unid; totMermaU+=mermaU; totMermaR+=mermaR;
       var pname = p.replace('BQT ','');
-      avgRows  += '<tr><td>'+pname+'</td><td>$'+fmt(venta)+'</td><td>'+Math.round(unid)+'</td></tr>';
+      avgRows  += '<tr><td>'+pname+'</td><td>$'+fmt(venta)+'</td><td>'+fmt(unid)+'</td></tr>';
       projRows += '<tr><td>'+pname+'</td>'
         +'<td class="'+(mermaU>0?'red':'')+'">'+fmt(mermaU)+'</td>'
         +'<td class="'+(mermaR>0?'red':'')+'">$'+fmt(mermaR)+'</td></tr>';
     });
-    avgRows  += '<tr class="total"><td>Total</td><td>$'+fmt(totVenta)+'</td><td>'+Math.round(totUnid)+'</td></tr>';
+    avgRows  += '<tr class="total"><td>Total</td><td>$'+fmt(totVenta)+'</td><td>'+fmt(totUnid)+'</td></tr>';
     projRows += '<tr class="total"><td>Total</td><td class="red">'+fmt(totMermaU)+'</td><td class="red">$'+fmt(totMermaR)+'</td></tr>';
 
   } else {
-    // Modo global: productos que aparecen en TODAS las tiendas
+    // Modo global: sumar raw de todos los productos en todas las tiendas — misma fuente que totales de Top Venta/Merma
     document.getElementById('avgTTitle').textContent  = 'Venta Promedio Semanal';
     document.getElementById('projTTitle').textContent = 'Comparacion Ultimas 3 Semanas';
 
-    // Filtrar productos presentes en todas las tiendas para la semana
-    var prodsEnTodas = prods.filter(function(p){
-      return tiendas.every(function(t){
-        var d = DATA.data[t] && DATA.data[t][semKeyProd] && DATA.data[t][semKeyProd][p];
-        return d && (d.v3 > 0 || d.avg > 0 || d.m3 > 0);
-      });
-    });
-    // Si no hay ninguno en todas, mostrar todos
-    if(prodsEnTodas.length === 0) prodsEnTodas = prods;
-
     var totVenta=0, totUnid=0, totMermaU=0, totMermaR=0;
-    prodsEnTodas.forEach(function(p){
+    prods.forEach(function(p){
       var ventaSum=0, unidSum=0, mermaUSum=0, mermaRSum=0;
       tiendas.forEach(function(t){
-        var d = (DATA.data[t]&&DATA.data[t][semKeyProd]&&DATA.data[t][semKeyProd][p]) || {};
-        ventaSum  += d.cfbc  || 0;
-        unidSum   += d.avg   || 0;
-        mermaUSum += d.m3    || 0;
-        mermaRSum += d.retail|| 0;
+        var d;
+        if(isAll){
+          d = (DATA.totales_prod_tienda && DATA.totales_prod_tienda[t] && DATA.totales_prod_tienda[t][p]) || {};
+          ventaSum  += d.venta_cfbc || 0;
+          unidSum   += d.ventas_u   || 0;
+          mermaUSum += d.merma_u    || 0;
+          mermaRSum += d.retail_vc  || 0;
+        } else {
+          d = (DATA.raw_prod_semana && DATA.raw_prod_semana[t] && DATA.raw_prod_semana[t][semKeyProd] && DATA.raw_prod_semana[t][semKeyProd][p]) || {};
+          ventaSum  += d.venta_cfbc || 0;
+          unidSum   += d.ventas_u   || 0;
+          mermaUSum += d.merma_u    || 0;
+          mermaRSum += d.retail_vc  || 0;
+        }
       });
+      // Solo mostrar productos con algún dato
+      if(ventaSum===0 && unidSum===0 && mermaUSum===0 && mermaRSum===0) return;
       totVenta+=ventaSum; totUnid+=unidSum; totMermaU+=mermaUSum; totMermaR+=mermaRSum;
       var pname = p.replace('BQT ','');
-      avgRows  += '<tr><td>'+pname+'</td><td>$'+fmt(ventaSum)+'</td><td>'+Math.round(unidSum)+'</td></tr>';
+      avgRows  += '<tr><td>'+pname+'</td><td>$'+fmt(ventaSum)+'</td><td>'+fmt(unidSum)+'</td></tr>';
       projRows += '<tr><td>'+pname+'</td>'
         +'<td class="'+(mermaUSum>0?'red':'')+'">'+fmt(mermaUSum)+'</td>'
         +'<td class="'+(mermaRSum>0?'red':'')+'">$'+fmt(mermaRSum)+'</td></tr>';
     });
-    avgRows  += '<tr class="total"><td>Total</td><td>$'+fmt(totVenta)+'</td><td>'+Math.round(totUnid)+'</td></tr>';
+    avgRows  += '<tr class="total"><td>Total</td><td>$'+fmt(totVenta)+'</td><td>'+fmt(totUnid)+'</td></tr>';
     projRows += '<tr class="total"><td>Total</td><td class="red">'+fmt(totMermaU)+'</td><td class="red">$'+fmt(totMermaR)+'</td></tr>';
   }
 
