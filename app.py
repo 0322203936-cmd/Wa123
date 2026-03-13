@@ -270,7 +270,7 @@ select{border:1px solid #bbb;border-radius:4px;padding:3px 7px;font-size:.72rem;
 .chip:hover{border-color:#0071ce;color:#0071ce}
 .chip.on{background:#0071ce;color:#fff;border-color:#0071ce}
 .grid{display:grid;grid-template-columns:1fr 1fr;padding:8px 16px;gap:8px;width:100%;box-sizing:border-box}
-.box{border:1px solid #bbb;border-radius:4px;overflow:hidden}
+.box{border:1px solid #bbb;border-radius:4px;overflow:visible}
 .box-hdr{background:#f0f0f0;border-bottom:1px solid #bbb;padding:4px 10px;text-align:center;font-size:.74rem;font-weight:700;color:#111}
 table.t{width:100%;border-collapse:collapse;font-size:.71rem}
 table.t th{padding:3px 8px;font-size:.66rem;font-weight:700;color:#333;border-bottom:1px solid #ccc;text-align:right;background:#fafafa}
@@ -282,9 +282,10 @@ table.t tr.total td{font-weight:700;border-top:1px solid #ddd;background:#f5f5f5
 .bold{font-weight:700}
 #viewTienda table.t tr:not(.total):hover td{background:#f0f7ff;cursor:pointer}
 #viewTienda{overflow:visible}
+html,body{height:auto;overflow-y:auto}
+#app{height:auto;overflow:visible}
 @media(max-width:1200px){
   .grid{grid-template-columns:1fr;gap:8px}
-  .box{overflow-y:auto;max-height:500px}
 }
 @media(max-width:768px){
   .grid{gap:6px;padding:6px 12px}
@@ -776,6 +777,26 @@ window.addEventListener('load', init);
       f.style.width  = '100%';
     });
   } catch(e){}
+
+  // Auto-resize iframe to fit full content height after render
+  function resizeIframe(){
+    try {
+      var h = document.documentElement.scrollHeight || document.body.scrollHeight;
+      var frames = window.parent.document.querySelectorAll('iframe');
+      frames.forEach(function(f){ f.style.height = (h + 20) + 'px'; });
+    } catch(e){}
+  }
+  // Resize on load and after any render
+  window.addEventListener('load', function(){ setTimeout(resizeIframe, 300); });
+  var _origRender = window.render;
+  // Patch render and renderTienda to resize after draw
+  var _patchResize = function(fn){
+    return function(){ fn.apply(this,arguments); setTimeout(resizeIframe,100); };
+  };
+  window.addEventListener('load', function(){
+    if(typeof render!=='undefined') render = _patchResize(render);
+    if(typeof renderTienda!=='undefined') renderTienda = _patchResize(renderTienda);
+  });
 })();
 </script>
 </body>
@@ -787,4 +808,4 @@ def build_html():
     ).decode('ascii')
     return HTML.replace('__DATA_JSON__', data_json)
 
-components.html(build_html(), height=980, scrolling=False)
+components.html(build_html(), height=1400, scrolling=True)
