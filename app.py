@@ -122,19 +122,35 @@ def cargar_datos(url: str = "") -> dict:
 
         if not producto or not tienda or not semana_num: continue
 
-        # Clave semana = año*100 + num  (ej: 202550)
-        semana = (anio * 100 + semana_num) if anio else semana_num
         records.append({
             'producto':   producto,
             'tienda':     tienda,
-            'semana':     semana,
+            '_semana_num': semana_num,
+            '_anio':       anio,
+            'semana':     (anio * 100 + semana_num) if anio else semana_num,
             'fecha':      fecha,
             'ventas_u':   sv(row[idx_ventas]),
             'embarque_u': sv(row[idx_embarque]),
-            'merma_u':    sv(row[idx_merma_vc]),  # Tomar directamente de Cant VC Tienda
-            'venta_cfbc': sv(row[idx_venta_cfbc]) if idx_venta_cfbc is not None else 0,  # Venta CFBC
-            'retail_vc':  sv(row[idx_retail_vc]) if idx_retail_vc is not None else 0,   # Retail VC Tienda
+            'merma_u':    sv(row[idx_merma_vc]),
+            'venta_cfbc': sv(row[idx_venta_cfbc]) if idx_venta_cfbc is not None else 0,
+            'retail_vc':  sv(row[idx_retail_vc]) if idx_retail_vc is not None else 0,
         })
+
+    # Inferir año para filas sin fecha usando el año más frecuente del mismo número de semana
+    from collections import Counter as _Counter
+    _sem_anio_votes = _Counter()
+    for r in records:
+        if r['_anio']:
+            _sem_anio_votes[(r['_semana_num'], r['_anio'])] += 1
+    _sem_to_anio = {}
+    for (wk, yr) in _sem_anio_votes:
+        if wk not in _sem_to_anio or _sem_anio_votes[(wk, yr)] > _sem_anio_votes[(_sem_to_anio[wk], yr)]:
+            _sem_to_anio[wk] = yr
+    for r in records:
+        if not r['_anio']:
+            yr_inf = _sem_to_anio.get(r['_semana_num'])
+            if yr_inf:
+                r['semana'] = yr_inf * 100 + r['_semana_num']
 
     semanas   = sorted(set(r['semana'] for r in records))
     tiendas   = sorted(set(r['tienda']  for r in records))
@@ -438,7 +454,15 @@ function init(){
   rowAll.appendChild(document.createTextNode('Seleccionar todas'));
   menu.appendChild(rowAll);
 
-  DATA.semanas.forEach(function(s){
+  // Filtrar semanas sin año si ya existe la versión con año del mismo número de semana
+  var semanasConAnio = DATA.semanas.filter(function(s){ return s > 9999; });
+  var numsSemConAnio = semanasConAnio.map(function(s){ return s % 100; });
+  var semanasRender  = DATA.semanas.filter(function(s){
+    if(s > 9999) return true;                       // siempre incluir las que tienen año
+    return numsSemConAnio.indexOf(s) === -1;         // bare solo si no hay duplicado con año
+  });
+
+  semanasRender.forEach(function(s){
     var yr = Math.floor(s/100), wk = s%100;
     var labelTxt = (yr >= 2000) ? yr+' · Semana '+String(wk).padStart(2,'0') : 'Semana '+String(s).padStart(2,'0');
     var isLast = (s === DATA.semanas[DATA.semanas.length-1]);
