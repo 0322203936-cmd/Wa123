@@ -254,6 +254,7 @@ table.t td:first-child{text-align:left;color:#111}
 table.t tr.total td{font-weight:700;border-top:1px solid #ddd;background:#f5f5f5}
 .red{color:#c00;font-weight:600}
 .bold{font-weight:700}
+#viewTienda table.t tr:not(.total):hover td{background:#f0f7ff;cursor:pointer}
 #viewTienda{overflow:visible}
 @media(max-width:1200px){
   .grid{grid-template-columns:1fr;gap:8px}
@@ -340,13 +341,13 @@ table.t tr.total td{font-weight:700;border-top:1px solid #ddd;background:#f5f5f5
       <tbody id="tMermaT"></tbody></table>
     </div>
     <div class="box">
-      <div class="box-hdr">Venta Promedio Semanal</div>
-      <table class="t"><thead><tr><th>Tienda</th><th></th></tr></thead>
+      <div class="box-hdr" id="avgTTitle">Venta Promedio Semanal</div>
+      <table class="t"><thead><tr><th>Producto</th><th>Venta</th><th>Unidades</th></tr></thead>
       <tbody id="tAvgT"></tbody></table>
     </div>
     <div class="box">
-      <div class="box-hdr">Comparacion Ultimas 3 Semanas</div>
-      <table class="t"><thead><tr><th>Tienda</th><th></th></tr></thead>
+      <div class="box-hdr" id="projTTitle">Comparacion Ultimas 3 Semanas</div>
+      <table class="t"><thead><tr><th>Merma Producto</th><th>Unidades</th><th>Cantidad</th></tr></thead>
       <tbody id="tProjT"></tbody></table>
     </div>
   </div>
@@ -354,7 +355,7 @@ table.t tr.total td{font-weight:700;border-top:1px solid #ddd;background:#f5f5f5
 
 <script>
 var DATA = JSON.parse(atob('__DATA_JSON__'));
-var state = { semana: null, tienda: null, view: 'producto' };
+var state = { semana: null, tienda: null, view: 'producto', tiendaT: null };
 var DIAS  = ['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
 var MESES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
 
@@ -394,7 +395,7 @@ function buildChips(){
 }
 
 function selTienda(t){ state.tienda=t; buildChips(); updateHeader(); if(state.view==='producto') render(); else renderTienda(); }
-function onSem(v){ state.semana = (v==='all') ? 'all' : parseInt(v); updateHeader(); if(state.view==='producto') render(); else renderTienda(); }
+function onSem(v){ state.semana = (v==='all') ? 'all' : parseInt(v); state.tiendaT = null; updateHeader(); if(state.view==='producto') render(); else renderTienda(); }
 
 function updateHeader(){
   if(state.semana === 'all'){
@@ -470,8 +471,14 @@ function setView(v){
     if(tiendaLabel) tiendaLabel.style.display = 'block';
   }
   
-  if(v==='tienda') renderTienda();
+  if(v==='tienda'){ state.tiendaT = null; renderTienda(); }
   else render();
+}
+
+function selTiendaT(t){
+  // Toggle: si ya está seleccionada, deseleccionar
+  state.tiendaT = (state.tiendaT === t) ? null : t;
+  renderTienda();
 }
 
 function renderTienda(){
@@ -486,14 +493,12 @@ function renderTienda(){
   tiendas.forEach(function(tienda){
     var emb=0, cfbc=0, merma=0, retail=0;
     if(isAll){
-      // Usar totales globales precalculados en Python
       var tot = (DATA.totales_tienda && DATA.totales_tienda[tienda]) || {};
       emb    = tot.embarque_u || 0;
       cfbc   = tot.venta_cfbc || 0;
       merma  = tot.merma_u    || 0;
       retail = tot.retail_vc  || 0;
     } else {
-      // Usar raw de la semana seleccionada
       var raw = (DATA.raw_semana && DATA.raw_semana[tienda] && DATA.raw_semana[tienda][key]) || {};
       emb    = raw.embarque_u || 0;
       cfbc   = raw.venta_cfbc || 0;
@@ -504,52 +509,99 @@ function renderTienda(){
     tiendaData.push({tienda:tienda, emb:emb, cfbc:cfbc, merma:merma, retail:retail});
   });
 
-  // ── TOP VENTA: UNIDADES = Cntd Embarque | VENTA = Venta CFBC ──
+  // ── TOP VENTA: filas clickeables ──
   var histRows='';
   tiendaData.forEach(function(t){
     var pct = totCfbc > 0 ? Math.round(t.cfbc/totCfbc*100) : 0;
-    histRows += '<tr><td>'+t.tienda+'</td><td>'+fmt(t.emb)+'</td><td>$'+fmt(t.cfbc)+'</td><td>'+pct+'%</td></tr>';
+    var sel = state.tiendaT === t.tienda;
+    var style = sel ? 'style="background:#e8f0fe;font-weight:700;cursor:pointer"' : 'style="cursor:pointer"';
+    histRows += '<tr '+style+' onclick="selTiendaT(\''+t.tienda.replace(/'/g,"\\'")+'\')">'
+      +'<td>'+t.tienda+'</td><td>'+fmt(t.emb)+'</td><td>$'+fmt(t.cfbc)+'</td><td>'+pct+'%</td></tr>';
   });
   histRows += '<tr class="total"><td>Total</td><td>'+fmt(totEmb)+'</td><td>$'+fmt(totCfbc)+'</td><td>100%</td></tr>';
 
-  // ── TOP MERMA: UNIDADES = Cant VC Tienda | CANTIDAD = Retail VC Tienda ──
+  // ── TOP MERMA: filas clickeables ──
   var mermaRows='';
   tiendaData.forEach(function(t){
     var pct_retail = totRetail > 0 ? Math.round(t.retail/totRetail*100) : 0;
-    mermaRows += '<tr><td>'+t.tienda+'</td><td class="'+(t.merma>0?'red':'')+'">'+fmt(t.merma)+'</td><td>$</td><td class="'+(t.retail>0?'red':'')+'">'+fmt(t.retail)+'</td><td class="'+(pct_retail>0?'red':'')+'">'+pct_retail+'%</td></tr>';
+    var sel = state.tiendaT === t.tienda;
+    var style = sel ? 'style="background:#fff0f0;font-weight:700;cursor:pointer"' : 'style="cursor:pointer"';
+    mermaRows += '<tr '+style+' onclick="selTiendaT(\''+t.tienda.replace(/'/g,"\\'")+'\')">'
+      +'<td>'+t.tienda+'</td>'
+      +'<td class="'+(t.merma>0?'red':'')+'">'+fmt(t.merma)+'</td>'
+      +'<td>$</td>'
+      +'<td class="'+(t.retail>0?'red':'')+'">'+fmt(t.retail)+'</td>'
+      +'<td class="'+(pct_retail>0?'red':'')+'">'+pct_retail+'%</td></tr>';
   });
   mermaRows += '<tr class="total"><td>Total</td><td class="red">'+fmt(totMerma)+'</td><td>$</td><td class="red">'+fmt(totRetail)+'</td><td class="red">100%</td></tr>';
-  
-  // ── Venta Promedio y Comparación: usar semana actual (o última si global) ──
+
+  // ── Semana clave para productos ──
   var semKeyProd = isAll ? String(DATA.semanas[DATA.semanas.length-1]) : key;
   var prods = DATA.productos;
-  var totAvg=0, totProj=0;
-  var tiendaDataSem = [];
-  tiendas.forEach(function(tienda){
-    var v3t=0, avg3t=0, proj3t=0;
+
+  // Determinar qué tiendas y productos mostrar en las tablas inferiores
+  var avgRows='', projRows='';
+
+  if(state.tiendaT){
+    // Modo: tienda seleccionada — mostrar productos de esa tienda
+    var tSel = state.tiendaT;
+    var tName = tSel.replace('SC ','');
+    document.getElementById('avgTTitle').textContent  = 'Venta Promedio — '+tName;
+    document.getElementById('projTTitle').textContent = 'Merma Últ. 3 Sem — '+tName;
+
+    var totVenta=0, totUnid=0, totMermaU=0, totMermaR=0;
     prods.forEach(function(p){
-      var d = (DATA.data[tienda]&&DATA.data[tienda][semKeyProd]&&DATA.data[tienda][semKeyProd][p]) || {v3:0,avg:0,proj:0};
-      v3t+=d.v3||0; avg3t+=d.avg||0; proj3t+=d.proj||0;
+      var d = (DATA.data[tSel]&&DATA.data[tSel][semKeyProd]&&DATA.data[tSel][semKeyProd][p]) || {};
+      var venta  = d.cfbc  || 0;   // Venta CFBC
+      var unid   = d.avg   || 0;   // Promedio unidades
+      var mermaU = d.m3    || 0;   // Merma unidades
+      var mermaR = d.retail|| 0;   // Retail VC (cantidad $)
+      totVenta+=venta; totUnid+=unid; totMermaU+=mermaU; totMermaR+=mermaR;
+      var pname = p.replace('BQT ','');
+      avgRows  += '<tr><td>'+pname+'</td><td>$'+fmt(venta)+'</td><td>'+Math.round(unid)+'</td></tr>';
+      projRows += '<tr><td>'+pname+'</td>'
+        +'<td class="'+(mermaU>0?'red':'')+'">'+fmt(mermaU)+'</td>'
+        +'<td class="'+(mermaR>0?'red':'')+'">$'+fmt(mermaR)+'</td></tr>';
     });
-    totAvg+=avg3t; totProj+=proj3t;
-    tiendaDataSem.push({tienda:tienda, v3:v3t, avg:avg3t, proj:proj3t});
-  });
-  
-  // Generar filas para Venta Promedio (datos de la semana actual)
-  var avgRows='';
-  tiendaDataSem.forEach(function(t){
-    var avg_semanal = t.v3 / 3;
-    avgRows   += '<tr><td>'+t.tienda+'</td><td>'+Math.round(avg_semanal)+'</td></tr>';
-  });
-  avgRows   += '<tr class="total"><td>Total</td><td>'+Math.round(totAvg/tiendas.length)+'</td></tr>';
-  
-  // Generar filas para Comparación (datos de la semana actual)
-  var projRows='';
-  tiendaDataSem.forEach(function(t){
-    projRows  += '<tr><td>'+t.tienda+'</td><td class="bold">'+fmt(t.proj)+'</td></tr>';
-  });
-  projRows  += '<tr class="total"><td>Total</td><td>'+fmt(totProj)+'</td></tr>';
-  
+    avgRows  += '<tr class="total"><td>Total</td><td>$'+fmt(totVenta)+'</td><td>'+Math.round(totUnid)+'</td></tr>';
+    projRows += '<tr class="total"><td>Total</td><td class="red">'+fmt(totMermaU)+'</td><td class="red">$'+fmt(totMermaR)+'</td></tr>';
+
+  } else {
+    // Modo global: productos que aparecen en TODAS las tiendas
+    document.getElementById('avgTTitle').textContent  = 'Venta Promedio Semanal';
+    document.getElementById('projTTitle').textContent = 'Comparacion Ultimas 3 Semanas';
+
+    // Filtrar productos presentes en todas las tiendas para la semana
+    var prodsEnTodas = prods.filter(function(p){
+      return tiendas.every(function(t){
+        var d = DATA.data[t] && DATA.data[t][semKeyProd] && DATA.data[t][semKeyProd][p];
+        return d && (d.v3 > 0 || d.avg > 0 || d.m3 > 0);
+      });
+    });
+    // Si no hay ninguno en todas, mostrar todos
+    if(prodsEnTodas.length === 0) prodsEnTodas = prods;
+
+    var totVenta=0, totUnid=0, totMermaU=0, totMermaR=0;
+    prodsEnTodas.forEach(function(p){
+      var ventaSum=0, unidSum=0, mermaUSum=0, mermaRSum=0;
+      tiendas.forEach(function(t){
+        var d = (DATA.data[t]&&DATA.data[t][semKeyProd]&&DATA.data[t][semKeyProd][p]) || {};
+        ventaSum  += d.cfbc  || 0;
+        unidSum   += d.avg   || 0;
+        mermaUSum += d.m3    || 0;
+        mermaRSum += d.retail|| 0;
+      });
+      totVenta+=ventaSum; totUnid+=unidSum; totMermaU+=mermaUSum; totMermaR+=mermaRSum;
+      var pname = p.replace('BQT ','');
+      avgRows  += '<tr><td>'+pname+'</td><td>$'+fmt(ventaSum)+'</td><td>'+Math.round(unidSum)+'</td></tr>';
+      projRows += '<tr><td>'+pname+'</td>'
+        +'<td class="'+(mermaUSum>0?'red':'')+'">'+fmt(mermaUSum)+'</td>'
+        +'<td class="'+(mermaRSum>0?'red':'')+'">$'+fmt(mermaRSum)+'</td></tr>';
+    });
+    avgRows  += '<tr class="total"><td>Total</td><td>$'+fmt(totVenta)+'</td><td>'+Math.round(totUnid)+'</td></tr>';
+    projRows += '<tr class="total"><td>Total</td><td class="red">'+fmt(totMermaU)+'</td><td class="red">$'+fmt(totMermaR)+'</td></tr>';
+  }
+
   document.getElementById('tHistT').innerHTML  = histRows;
   document.getElementById('tMermaT').innerHTML = mermaRows;
   document.getElementById('tAvgT').innerHTML   = avgRows;
@@ -628,10 +680,10 @@ function imprimirReporte(){
     +     '<table><thead><tr><th>Producto</th><th>Embarque</th><th>Merma</th><th>Merma %</th></tr></thead>'
     +     '<tbody>'+tMerma+'</tbody></table></div>'
     +   '<div class="box"><div class="box-hdr">Venta Promedio Semanal</div>'
-    +     '<table><thead><tr><th>Producto</th><th>Promedio</th></tr></thead>'
+    +     '<table><thead><tr><th>Producto</th><th>Venta</th><th>Unidades</th></tr></thead>'
     +     '<tbody>'+tAvg+'</tbody></table></div>'
     +   '<div class="box"><div class="box-hdr">'+projTit+'</div>'
-    +     '<table><thead><tr><th>Producto</th><th>Proyecci\u00f3n</th></tr></thead>'
+    +     '<table><thead><tr><th>Merma Producto</th><th>Unidades</th><th>Cantidad</th></tr></thead>'
     +     '<tbody>'+tProj+'</tbody></table></div>'
     + '</div>'
     // ── SIN footer de fecha ──
