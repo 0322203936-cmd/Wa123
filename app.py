@@ -351,7 +351,13 @@ html,body{height:auto;overflow-y:auto}
       <div id="semDropMenu" style="display:none;position:absolute;top:100%;left:0;z-index:999;background:#fff;border:1px solid #bbb;border-radius:4px;box-shadow:0 3px 10px rgba(0,0,0,.15);min-width:200px;max-height:260px;overflow-y:auto;padding:4px 0"></div>
     </div>
     <label>Tienda:</label>
-    <div class="chip-wrap" id="chips"></div>
+    <div style="position:relative;display:inline-block" id="tiendaDropWrap">
+      <button id="tiendaDropBtn" onclick="toggleTiendaDrop()" style="border:1px solid #bbb;border-radius:4px;padding:3px 24px 3px 7px;font-size:.72rem;cursor:pointer;background:#fff;min-width:160px;text-align:left;position:relative">
+        <span id="tiendaDropLabel">— Seleccionar tiendas —</span>
+        <span style="position:absolute;right:6px;top:50%;transform:translateY(-50%);font-size:.6rem">▼</span>
+      </button>
+      <div id="tiendaDropMenu" style="display:none;position:absolute;top:100%;left:0;z-index:999;background:#fff;border:1px solid #bbb;border-radius:4px;box-shadow:0 3px 10px rgba(0,0,0,.15);min-width:200px;max-height:260px;overflow-y:auto;padding:4px 0"></div>
+    </div>
     <div style="margin-top:12px; display:flex; gap:8px;">
       <button onclick="setView('producto')" id="btnProd" style="padding:6px 12px; background:#0071ce; color:white; border:none; border-radius:4px; cursor:pointer; font-weight:600;">📊 Producto</button>
       <button onclick="setView('tienda')" id="btnTiend" style="padding:6px 12px; background:#ccc; color:#333; border:none; border-radius:4px; cursor:pointer; font-weight:600;">🏪 Tienda</button>
@@ -483,11 +489,47 @@ function init(){
   document.addEventListener('click', function(e){
     var wrap = document.getElementById('semDropWrap');
     if(wrap && !wrap.contains(e.target)) closeSemDrop();
+    var wrapT = document.getElementById('tiendaDropWrap');
+    if(wrapT && !wrapT.contains(e.target)) closeTiendaDrop();
   });
+  
+  // ── Crear dropdown de tiendas ──
+  var menuT = document.getElementById('tiendaDropMenu');
+  
+  // Opción "Seleccionar todas" para tiendas
+  var rowAllT = document.createElement('label');
+  rowAllT.id = 'tienda-row-all';
+  rowAllT.style.cssText = 'display:flex;align-items:center;gap:6px;padding:5px 10px;cursor:pointer;font-weight:700;border-bottom:1px solid #ddd;background:#f5f5f5;font-size:.72rem';
+  var chkAllT = document.createElement('input');
+  chkAllT.type = 'checkbox';
+  chkAllT.id = 'chkTodasTienda';
+  chkAllT.onchange = function(){ toggleTodasTiendas(); };
+  rowAllT.appendChild(chkAllT);
+  rowAllT.appendChild(document.createTextNode('Seleccionar todas'));
+  menuT.appendChild(rowAllT);
+  
+  DATA.tiendas.forEach(function(t){
+    var labelTxt = t.replace('SC ','');
+    var isFirst = (t === DATA.tiendas[0]);
+    var rowT = document.createElement('label');
+    rowT.className = 'sem-item' + (isFirst ? ' on' : '');
+    rowT.id = 'tienda-row-'+t;
+    var chkT = document.createElement('input');
+    chkT.type = 'checkbox';
+    chkT.className = 'tienda-chk';
+    chkT.value = t;
+    chkT.checked = isFirst;
+    chkT.onchange = function(){ onTiendaChk(); };
+    rowT.appendChild(chkT);
+    rowT.appendChild(document.createTextNode(labelTxt));
+    menuT.appendChild(rowT);
+  });
+  
   state.semana = DATA.semanas[DATA.semanas.length-1];
   state.semanas_sel = [state.semana];
   state.tienda = DATA.tiendas[0];
-  buildChips(); updateHeader(); updateSemLabel(); render();
+  state.tiendas_sel = [DATA.tiendas[0]];
+  updateHeader(); updateSemLabel(); updateTiendaLabel(); render();
   document.getElementById('loader').style.display = 'none';
   document.getElementById('app').style.display    = 'block';
 }
@@ -498,6 +540,72 @@ function toggleSemDrop(){
 }
 function closeSemDrop(){
   document.getElementById('semDropMenu').style.display = 'none';
+}
+
+function toggleTiendaDrop(){
+  var menu = document.getElementById('tiendaDropMenu');
+  menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+}
+function closeTiendaDrop(){
+  document.getElementById('tiendaDropMenu').style.display = 'none';
+}
+
+function updateTiendaLabel(){
+  var sel = state.tiendas_sel;
+  var lbl = document.getElementById('tiendaDropLabel');
+  if(!sel || sel.length === 0){
+    lbl.textContent = '— Todas las tiendas —';
+  } else if(sel.length === 1){
+    lbl.textContent = sel[0].replace('SC ','');
+  } else {
+    lbl.textContent = sel.length+' tiendas seleccionadas';
+  }
+}
+
+function onTiendaChk(){
+  var chks = document.querySelectorAll('#tiendaDropMenu input[type=checkbox].tienda-chk');
+  var selected = [];
+  chks.forEach(function(c){
+    var t = c.value;
+    var row = document.getElementById('tienda-row-'+t);
+    if(c.checked){
+      selected.push(t);
+      if(row) row.className = 'sem-item on';
+    } else {
+      if(row) row.className = 'sem-item';
+    }
+  });
+  var esGlobal = (selected.length === DATA.tiendas.length);
+  state.tiendas_sel = esGlobal ? [] : selected;
+  state.tienda = selected.length > 0 ? selected[0] : DATA.tiendas[0];
+  state.tiendaT = null;
+  updateTiendaLabel();
+  updateHeader();
+  syncChkTodasTiendas();
+  if(state.view==='producto') render(); else renderTienda();
+}
+
+function toggleTodasTiendas(){
+  var chkAll = document.getElementById('chkTodasTienda');
+  var allChecked = chkAll.checked;
+  var chks = document.querySelectorAll('#tiendaDropMenu input[type=checkbox].tienda-chk');
+  chks.forEach(function(c){
+    c.checked = allChecked;
+    var t = c.value;
+    var row = document.getElementById('tienda-row-'+t);
+    if(row) row.className = 'sem-item' + (allChecked ? ' on' : '');
+  });
+  onTiendaChk();
+}
+
+function syncChkTodasTiendas(){
+  var chks = document.querySelectorAll('#tiendaDropMenu input[type=checkbox].tienda-chk');
+  var chkAll = document.getElementById('chkTodasTienda');
+  if(!chkAll) return;
+  var total = chks.length, checked = 0;
+  chks.forEach(function(c){ if(c.checked) checked++; });
+  chkAll.checked = (checked === total);
+  chkAll.indeterminate = (checked > 0 && checked < total);
 }
 
 function updateSemLabel(){
@@ -540,30 +648,21 @@ function onSemChk(){
 
 function onSem(sel){ onSemChk(); }
 
-function buildChips(){
-  document.getElementById('chips').innerHTML = DATA.tiendas.map(function(t){
-    var n = t.replace('SC ','');
-    return '<button class="chip'+(t===state.tienda?' on':'')+'" onclick="selTienda(\''+t+'\')">'+n+'</button>';
-  }).join('');
-}
-
-function selTienda(t){ state.tienda=t; buildChips(); updateHeader(); if(state.view==='producto') render(); else renderTienda(); }
-function onSem(sel){
-  var selected = [];
-  for(var i=0;i<sel.options.length;i++){
-    if(sel.options[i].selected) selected.push(parseInt(sel.options[i].value));
-  }
-  state.semanas_sel = selected;
-  state.semana = selected.length > 0 ? selected[selected.length-1] : 'all';
-  state.tiendaT = null;
-  updateHeader();
-  if(state.view==='producto') render(); else renderTienda();
-}
-
 function updateHeader(){
   var sems = getSemanasActivas();
+  var tiendas = getTiendasActivas();
   var isAll = (!state.semanas_sel || state.semanas_sel.length === 0);
-  document.getElementById('hdrTienda').textContent = state.tienda;
+  
+  // Mostrar tiendas seleccionadas
+  if(!state.tiendas_sel || state.tiendas_sel.length === 0){
+    document.getElementById('hdrTienda').textContent = 'Todas las tiendas';
+  } else if(state.tiendas_sel.length === 1){
+    document.getElementById('hdrTienda').textContent = state.tiendas_sel[0];
+  } else {
+    var tiendasStr = state.tiendas_sel.map(function(t){ return t.replace('SC ',''); }).join(', ');
+    document.getElementById('hdrTienda').textContent = tiendasStr;
+  }
+  
   if(isAll){
     var s0 = DATA.semanas[0], sN = DATA.semanas[DATA.semanas.length-1];
     var f0 = (DATA.fecha_por_semana && (DATA.fecha_por_semana[String(s0)] || DATA.fecha_por_semana[s0])) || '—';
@@ -606,21 +705,29 @@ function getSemanasActivas(){
   return state.semanas_sel;
 }
 
+function getTiendasActivas(){
+  if(!state.tiendas_sel || state.tiendas_sel.length === 0) return DATA.tiendas;
+  return state.tiendas_sel;
+}
+
 function getD(){
   var sems = getSemanasActivas();
+  var tiendas = getTiendasActivas();
   var prods = DATA.productos;
   var merged = {};
   prods.forEach(function(p){
     var v12=0,v3=0,emb=0,m3=0,cfbc=0,retail=0;
-    sems.forEach(function(s){
-      var key = String(s);
-      var d = (DATA.data[state.tienda]&&DATA.data[state.tienda][key]&&DATA.data[state.tienda][key][p]) || {};
-      v12   += d.v12   || 0;
-      v3    += d.v3    || 0;
-      emb   += d.emb   || 0;
-      m3    += d.m3    || 0;
-      cfbc  += d.cfbc  || 0;
-      retail+= d.retail|| 0;
+    tiendas.forEach(function(t){
+      sems.forEach(function(s){
+        var key = String(s);
+        var d = (DATA.data[t]&&DATA.data[t][key]&&DATA.data[t][key][p]) || {};
+        v12   += d.v12   || 0;
+        v3    += d.v3    || 0;
+        emb   += d.emb   || 0;
+        m3    += d.m3    || 0;
+        cfbc  += d.cfbc  || 0;
+        retail+= d.retail|| 0;
+      });
     });
     var avg = sems.length > 0 ? v3 / sems.length : 0;
     var merma_ratio = emb > 0 ? m3/emb : 0;
@@ -683,13 +790,13 @@ function setView(v){
   document.getElementById('viewTienda').style.display = v==='tienda' ? 'grid' : 'none';
   
   // Ocultar filtros de tienda en vista Tienda
-  var chipWrap = document.querySelector('.chip-wrap');
+  var tiendaDropWrap = document.getElementById('tiendaDropWrap');
   var tiendaLabel = Array.from(document.querySelectorAll('.ctrl label')).find(el => el.textContent === 'Tienda:');
   if(v==='tienda'){
-    if(chipWrap) chipWrap.style.display = 'none';
+    if(tiendaDropWrap) tiendaDropWrap.style.display = 'none';
     if(tiendaLabel) tiendaLabel.style.display = 'none';
   } else {
-    if(chipWrap) chipWrap.style.display = 'flex';
+    if(tiendaDropWrap) tiendaDropWrap.style.display = 'inline-block';
     if(tiendaLabel) tiendaLabel.style.display = 'block';
   }
   
