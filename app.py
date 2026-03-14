@@ -828,7 +828,7 @@ function render(){
   prodArr.slice().sort(function(a,b){ return b.v.v12-a.v.v12; }).forEach(function(o){
     var name=o.p.replace('BQT ',''), v=o.v;
     var div12 = (v.n12 && v.n12 > 0) ? v.n12 : 1;
-    avgRows += '<tr><td>'+name+'</td><td>'+Math.round(v.v12/div12)+'</td><td>'+Math.round(v.v3/3)+'</td></tr>';
+    avgRows += '<tr><td>'+name+'</td><td>'+parseFloat((v.v12/div12).toFixed(3))+'</td><td>'+Math.round(v.v3/3)+'</td></tr>';
   });
   prodArr.slice().sort(function(a,b){ return b.v.proj-a.v.proj; }).forEach(function(o){
     var name=o.p.replace('BQT ',''), v=o.v;
@@ -840,7 +840,7 @@ function render(){
   mermaRows += '<tr class="total"><td>Total</td><td>'+fmt(totEmb)+'</td><td class="red">'+fmt(totM3)+'</td><td class="red">'+pct_merma_total+'%</td></tr>';
   var totDiv12 = 1;
   prodArr.forEach(function(o){ if((o.v.n12||0) > totDiv12) totDiv12 = o.v.n12; });
-  avgRows   += '<tr class="total"><td>Total</td><td>'+Math.round(totV12/totDiv12)+'</td><td>'+Math.round(totV3/3)+'</td></tr>';
+  avgRows   += '<tr class="total"><td>Total</td><td>'+parseFloat((totV12/totDiv12).toFixed(3))+'</td><td>'+Math.round(totV3/3)+'</td></tr>';
   projRows  += '<tr class="total"><td>Total</td><td>'+fmt(totProj)+'</td></tr>';
   document.getElementById('tHist').innerHTML  = histRows;
   document.getElementById('tMerma').innerHTML = mermaRows;
