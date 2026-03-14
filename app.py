@@ -102,6 +102,18 @@ def cargar_datos(url: str = "") -> dict:
             f"Inventario no estará disponible. Columnas disponibles: {[h for h in headers if h]}"
         )
 
+    # Columnas de días de la semana (opcionales)
+    _dias = ['Dom', 'Lun', 'Mar', 'Mie', 'Jue', 'Vie', 'Sab']
+    idx_ctd   = {}
+    idx_vtas  = {}
+    for d in _dias:
+        try: idx_ctd[d] = col(f'Ctd {d}')
+        except: 
+            try: idx_ctd[d] = col(f'Cnt {d}')
+            except: idx_ctd[d] = None
+        try: idx_vtas[d] = col(f'Ventas {d}')
+        except: idx_vtas[d] = None
+
     records = []
     for row in ws.iter_rows(min_row=2, values_only=True):
         producto  = str(row[idx_producto]).strip() if row[idx_producto] else None
@@ -149,6 +161,8 @@ def cargar_datos(url: str = "") -> dict:
             'venta_cfbc': sv(row[idx_venta_cfbc]) if idx_venta_cfbc is not None else 0,
             'retail_vc':  sv(row[idx_retail_vc]) if idx_retail_vc is not None else 0,
             'inventario': sv(row[idx_inventario]) if idx_inventario is not None else 0,
+            **{f'ctd_{d.lower()}':  sv(row[idx_ctd[d]])  if idx_ctd[d]  is not None else 0 for d in _dias},
+            **{f'vtas_{d.lower()}': sv(row[idx_vtas[d]]) if idx_vtas[d] is not None else 0 for d in _dias},
         })
 
     # Inferir año para filas sin fecha usando el año más frecuente del mismo número de semana
@@ -178,6 +192,9 @@ def cargar_datos(url: str = "") -> dict:
         by_stp[r['semana']][r['tienda']][r['producto']]['merma_u']    += r['merma_u']
         by_stp[r['semana']][r['tienda']][r['producto']]['venta_cfbc'] += r['venta_cfbc']
         by_stp[r['semana']][r['tienda']][r['producto']]['retail_vc']  += r['retail_vc']
+        for d in ['dom','lun','mar','mie','jue','vie','sab']:
+            by_stp[r['semana']][r['tienda']][r['producto']][f'ctd_{d}']  += r.get(f'ctd_{d}', 0)
+            by_stp[r['semana']][r['tienda']][r['producto']][f'vtas_{d}'] += r.get(f'vtas_{d}', 0)
         by_stp[r['semana']][r['tienda']][r['producto']]['inventario'] += r['inventario']
 
     # Fecha real del Excel por semana
@@ -240,6 +257,9 @@ def cargar_datos(url: str = "") -> dict:
         totales_prod_tienda[r['tienda']][r['producto']]['retail_vc']  += r['retail_vc']
         totales_prod_tienda[r['tienda']][r['producto']]['ventas_u']   += r['ventas_u']
         totales_prod_tienda[r['tienda']][r['producto']]['inventario'] += r['inventario']
+        for d in ['dom','lun','mar','mie','jue','vie','sab']:
+            totales_prod_tienda[r['tienda']][r['producto']][f'ctd_{d}']  += r.get(f'ctd_{d}', 0)
+            totales_prod_tienda[r['tienda']][r['producto']][f'vtas_{d}'] += r.get(f'vtas_{d}', 0)
 
     # raw por tienda+semana+producto (exactamente la semana seleccionada)
     raw_prod_semana = {}
@@ -257,6 +277,8 @@ def cargar_datos(url: str = "") -> dict:
                         'retail_vc':  round(d['retail_vc']),
                         'embarque_u': round(d['embarque_u']),
                         'inventario': round(d['inventario']),
+                        **{f'ctd_{d_str}': round(d[f'ctd_{d_str}']) for d_str in ['dom','lun','mar','mie','jue','vie','sab']},
+                        **{f'vtas_{d_str}': round(d[f'vtas_{d_str}']) for d_str in ['dom','lun','mar','mie','jue','vie','sab']}
                     }
 
     # Agregaciones de inventario por tienda (suma de todos los productos)
@@ -452,6 +474,19 @@ html,body{height:auto;overflow-y:auto}
       <div class="box-hdr" id="projTTitle">Comparacion Ultimas 3 Semanas</div>
       <table class="t"><thead><tr><th>Merma Producto</th><th>Unidades</th><th>Cantidad</th></tr></thead>
       <tbody id="tProjT"></tbody></table>
+    </div>
+    <div class="box" id="boxDiasT" style="display:none; grid-column: 1 / -1; overflow-x: auto;">
+      <div class="box-hdr">Ventas por Día</div>
+      <table class="t" style="min-width: 800px;">
+        <thead>
+          <tr>
+            <th>Producto</th>
+            <th>Cnt Sab</th><th>Ctd Dom</th><th>Ctd Lun</th><th>Ctd Mar</th><th>Ctd Mie</th><th>Ctd Jue</th><th>Ctd Vie</th>
+            <th>Ventas Sab</th><th>Ventas Dom</th><th>Ventas Lun</th><th>Ventas Mar</th><th>Ventas Mie</th><th>Ventas Jue</th><th>Ventas Vie</th>
+          </tr>
+        </thead>
+        <tbody id="tDiasT"></tbody>
+      </table>
     </div>
   </div>
 
@@ -943,7 +978,7 @@ function renderTienda(){
   var prods = DATA.productos;
 
   // Determinar qué tiendas y productos mostrar en las tablas inferiores
-  var avgRows='', projRows='';
+  var avgRows='', projRows='', diasRows='';
 
   if(state.tiendaT){
     var tSel = state.tiendaT;
@@ -952,21 +987,30 @@ function renderTienda(){
     document.getElementById('projTTitle').textContent = 'Merma — '+tName;
 
     var totVenta=0, totUnid=0, totMermaU=0, totMermaR=0;
+    var tDias = {cs:0,cd:0,cl:0,cma:0,cmi:0,cj:0,cv:0,
+                 vs:0,vd:0,vl:0,vma:0,vmi:0,vj:0,vv:0};
+
     // Construir array con datos por producto
     var prodItems = prods.map(function(p){
       if(isAll){
         var d = (DATA.totales_prod_tienda && DATA.totales_prod_tienda[tSel] && DATA.totales_prod_tienda[tSel][p]) || {};
-        return { p:p, venta:d.venta_cfbc||0, unid:d.embarque_u||0, mermaU:d.merma_u||0, mermaR:d.retail_vc||0 };
+        return { p:p, venta:d.venta_cfbc||0, unid:d.embarque_u||0, mermaU:d.merma_u||0, mermaR:d.retail_vc||0, dias:d };
       } else {
         var venta=0, unid=0, mermaU=0, mermaR=0;
+        var r = { ctd_sab:0, ctd_dom:0, ctd_lun:0, ctd_mar:0, ctd_mie:0, ctd_jue:0, ctd_vie:0,
+                  vtas_sab:0, vtas_dom:0, vtas_lun:0, vtas_mar:0, vtas_mie:0, vtas_jue:0, vtas_vie:0 };
         sems.forEach(function(s){
           var dr = (DATA.raw_prod_semana && DATA.raw_prod_semana[tSel] && DATA.raw_prod_semana[tSel][String(s)] && DATA.raw_prod_semana[tSel][String(s)][p]) || {};
           venta  += dr.venta_cfbc||0;
           unid   += dr.embarque_u||0;
           mermaU += dr.merma_u||0;
           mermaR += dr.retail_vc||0;
+          r.ctd_sab += dr.ctd_sab||0; r.ctd_dom += dr.ctd_dom||0; r.ctd_lun += dr.ctd_lun||0;
+          r.ctd_mar += dr.ctd_mar||0; r.ctd_mie += dr.ctd_mie||0; r.ctd_jue += dr.ctd_jue||0; r.ctd_vie += dr.ctd_vie||0;
+          r.vtas_sab += dr.vtas_sab||0; r.vtas_dom += dr.vtas_dom||0; r.vtas_lun += dr.vtas_lun||0;
+          r.vtas_mar += dr.vtas_mar||0; r.vtas_mie += dr.vtas_mie||0; r.vtas_jue += dr.vtas_jue||0; r.vtas_vie += dr.vtas_vie||0;
         });
-        return { p:p, venta:venta, unid:unid, mermaU:mermaU, mermaR:mermaR };
+        return { p:p, venta:venta, unid:unid, mermaU:mermaU, mermaR:mermaR, dias:r };
       }
     });
     prodItems.forEach(function(o){ totVenta+=o.venta; totUnid+=o.unid; totMermaU+=o.mermaU; totMermaR+=o.mermaR; });
@@ -982,8 +1026,29 @@ function renderTienda(){
         +'<td class="'+(o.mermaU>0?'red':'')+'">'+fmt(o.mermaU)+'</td>'
         +'<td class="'+(o.mermaR>0?'red':'')+'">$'+fmt(o.mermaR)+'</td></tr>';
     });
+    
+    // Dias: mostrar productos y sus totales de Lunes a Domingo
+    prodItems.forEach(function(o){
+        var d = o.dias || {};
+        var totU = (d.ctd_sab||0)+(d.ctd_dom||0)+(d.ctd_lun||0)+(d.ctd_mar||0)+(d.ctd_mie||0)+(d.ctd_jue||0)+(d.ctd_vie||0);
+        o.totUDias = totU;
+    });
+    prodItems.slice().sort(function(a,b){ return b.venta-a.venta; }).forEach(function(o){
+      var pname = o.p.replace('BQT ','');
+      var d = o.dias || {};
+      tDias.cs += d.ctd_sab||0; tDias.cd += d.ctd_dom||0; tDias.cl += d.ctd_lun||0; tDias.cma += d.ctd_mar||0; tDias.cmi += d.ctd_mie||0; tDias.cj += d.ctd_jue||0; tDias.cv += d.ctd_vie||0;
+      tDias.vs += d.vtas_sab||0; tDias.vd += d.vtas_dom||0; tDias.vl += d.vtas_lun||0; tDias.vma += d.vtas_mar||0; tDias.vmi += d.vtas_mie||0; tDias.vj += d.vtas_jue||0; tDias.vv += d.vtas_vie||0;
+      
+      diasRows += '<tr><td>'+pname+'</td>' +
+        '<td>'+fmt(d.ctd_sab||0)+'</td><td>'+fmt(d.ctd_dom||0)+'</td><td>'+fmt(d.ctd_lun||0)+'</td><td>'+fmt(d.ctd_mar||0)+'</td><td>'+fmt(d.ctd_mie||0)+'</td><td>'+fmt(d.ctd_jue||0)+'</td><td>'+fmt(d.ctd_vie||0)+'</td>' +
+        '<td>$'+fmt(d.vtas_sab||0)+'</td><td>$'+fmt(d.vtas_dom||0)+'</td><td>$'+fmt(d.vtas_lun||0)+'</td><td>$'+fmt(d.vtas_mar||0)+'</td><td>$'+fmt(d.vtas_mie||0)+'</td><td>$'+fmt(d.vtas_jue||0)+'</td><td>$'+fmt(d.vtas_vie||0)+'</td></tr>';
+    });
+
     avgRows  += '<tr class="total"><td>Total</td><td>$'+fmt(totVenta)+'</td><td>'+fmt(totUnid)+'</td></tr>';
     projRows += '<tr class="total"><td>Total</td><td class="red">'+fmt(totMermaU)+'</td><td class="red">$'+fmt(totMermaR)+'</td></tr>';
+    diasRows += '<tr class="total"><td>Total</td>' +
+      '<td>'+fmt(tDias.cs)+'</td><td>'+fmt(tDias.cd)+'</td><td>'+fmt(tDias.cl)+'</td><td>'+fmt(tDias.cma)+'</td><td>'+fmt(tDias.cmi)+'</td><td>'+fmt(tDias.cj)+'</td><td>'+fmt(tDias.cv)+'</td>' +
+      '<td>$'+fmt(tDias.vs)+'</td><td>$'+fmt(tDias.vd)+'</td><td>$'+fmt(tDias.vl)+'</td><td>$'+fmt(tDias.vma)+'</td><td>$'+fmt(tDias.vmi)+'</td><td>$'+fmt(tDias.vj)+'</td><td>$'+fmt(tDias.vv)+'</td></tr>';
 
   } else {
     document.getElementById('avgTTitle').textContent  = 'Venta Promedio Semanal';
@@ -1035,11 +1100,13 @@ function renderTienda(){
   document.getElementById('tMermaT').innerHTML = mermaRows;
   document.getElementById('tAvgT').innerHTML   = avgRows;
   document.getElementById('tProjT').innerHTML  = projRows;
+  if(document.getElementById('tDiasT')) document.getElementById('tDiasT').innerHTML  = diasRows;
 
   // Mostrar/ocultar tablas inferiores según si hay tienda seleccionada
   var showBottom = state.tiendaT ? 'block' : 'none';
   document.getElementById('boxAvgT').style.display  = showBottom;
   document.getElementById('boxProjT').style.display = showBottom;
+  if(document.getElementById('boxDiasT')) document.getElementById('boxDiasT').style.display = showBottom;
 }
 
 // ─── INVENTARIO ─────────────────────────────────────────────────────────────
