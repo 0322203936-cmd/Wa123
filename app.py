@@ -1039,16 +1039,18 @@ function renderTienda(){
       tDias.cs += d.ctd_sab||0; tDias.cd += d.ctd_dom||0; tDias.cl += d.ctd_lun||0; tDias.cma += d.ctd_mar||0; tDias.cmi += d.ctd_mie||0; tDias.cj += d.ctd_jue||0; tDias.cv += d.ctd_vie||0;
       tDias.vs += d.vtas_sab||0; tDias.vd += d.vtas_dom||0; tDias.vl += d.vtas_lun||0; tDias.vma += d.vtas_mar||0; tDias.vmi += d.vtas_mie||0; tDias.vj += d.vtas_jue||0; tDias.vv += d.vtas_vie||0;
       
+      var q = function(v, pref){ return '<td class="'+(v>0?'red':'')+'">'+(pref||'')+fmt(v)+'</td>'; };
       diasRows += '<tr><td>'+pname+'</td>' +
-        '<td>'+fmt(d.ctd_sab||0)+'</td><td>'+fmt(d.ctd_dom||0)+'</td><td>'+fmt(d.ctd_lun||0)+'</td><td>'+fmt(d.ctd_mar||0)+'</td><td>'+fmt(d.ctd_mie||0)+'</td><td>'+fmt(d.ctd_jue||0)+'</td><td>'+fmt(d.ctd_vie||0)+'</td>' +
-        '<td>$'+fmt(d.vtas_sab||0)+'</td><td>$'+fmt(d.vtas_dom||0)+'</td><td>$'+fmt(d.vtas_lun||0)+'</td><td>$'+fmt(d.vtas_mar||0)+'</td><td>$'+fmt(d.vtas_mie||0)+'</td><td>$'+fmt(d.vtas_jue||0)+'</td><td>$'+fmt(d.vtas_vie||0)+'</td></tr>';
+        q(d.ctd_sab||0)+q(d.ctd_dom||0)+q(d.ctd_lun||0)+q(d.ctd_mar||0)+q(d.ctd_mie||0)+q(d.ctd_jue||0)+q(d.ctd_vie||0) +
+        q(d.vtas_sab||0, '$')+q(d.vtas_dom||0, '$')+q(d.vtas_lun||0, '$')+q(d.vtas_mar||0, '$')+q(d.vtas_mie||0, '$')+q(d.vtas_jue||0, '$')+q(d.vtas_vie||0, '$')+'</tr>';
     });
 
     avgRows  += '<tr class="total"><td>Total</td><td>$'+fmt(totVenta)+'</td><td>'+fmt(totUnid)+'</td></tr>';
     projRows += '<tr class="total"><td>Total</td><td class="red">'+fmt(totMermaU)+'</td><td class="red">$'+fmt(totMermaR)+'</td></tr>';
+    var qT = function(v, pref){ return '<td class="'+(v>0?'red':'')+'">'+(pref||'')+fmt(v)+'</td>'; };
     diasRows += '<tr class="total"><td>Total</td>' +
-      '<td>'+fmt(tDias.cs)+'</td><td>'+fmt(tDias.cd)+'</td><td>'+fmt(tDias.cl)+'</td><td>'+fmt(tDias.cma)+'</td><td>'+fmt(tDias.cmi)+'</td><td>'+fmt(tDias.cj)+'</td><td>'+fmt(tDias.cv)+'</td>' +
-      '<td>$'+fmt(tDias.vs)+'</td><td>$'+fmt(tDias.vd)+'</td><td>$'+fmt(tDias.vl)+'</td><td>$'+fmt(tDias.vma)+'</td><td>$'+fmt(tDias.vmi)+'</td><td>$'+fmt(tDias.vj)+'</td><td>$'+fmt(tDias.vv)+'</td></tr>';
+      qT(tDias.cs)+qT(tDias.cd)+qT(tDias.cl)+qT(tDias.cma)+qT(tDias.cmi)+qT(tDias.cj)+qT(tDias.cv) +
+      qT(tDias.vs, '$')+qT(tDias.vd, '$')+qT(tDias.vl, '$')+qT(tDias.vma, '$')+qT(tDias.vmi, '$')+qT(tDias.vj, '$')+qT(tDias.vv, '$')+'</tr>';
 
   } else {
     document.getElementById('avgTTitle').textContent  = 'Venta Promedio Semanal';
