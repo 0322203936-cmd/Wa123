@@ -1,9 +1,8 @@
- (cd "$(git rev-parse --show-toplevel)" && git apply --3way <<'EOF' 
 diff --git a/app.py b/app.py
-index 5c50810cdcdd59ad0d7875dbdd7964c598f04808..a8f43b1effc3b0bd04d9ada41c2ad9b7c03f6132 100644
+index 5c50810cdcdd59ad0d7875dbdd7964c598f04808..0750cfb29915d46ef2f0c36cb2d4af90f8cc5e8c 100644
 --- a/app.py
 +++ b/app.py
-@@ -1,84 +1,82 @@
+@@ -1,84 +1,83 @@
  """
  Walmex Dashboard — CFBC
  Reporte ejecutivo estilo Walmart
@@ -11,6 +10,7 @@ index 5c50810cdcdd59ad0d7875dbdd7964c598f04808..a8f43b1effc3b0bd04d9ada41c2ad9b7
 -import json, base64, openpyxl
 +import base64, openpyxl
  from collections import defaultdict
++from datetime import datetime as _dt
  from pathlib import Path
  import streamlit as st
  import streamlit.components.v1 as components
@@ -94,7 +94,54 @@ index 5c50810cdcdd59ad0d7875dbdd7964c598f04808..a8f43b1effc3b0bd04d9ada41c2ad9b7
      # Columna de inventario actual
      idx_inventario = None
      for _n in ['Cantidad Actual en Existentes de la tienda', 'Cantidad Actual en Existentes',
-@@ -150,147 +148,152 @@ def cargar_datos(url: str = "") -> dict:
+@@ -103,226 +102,232 @@ def cargar_datos(url: str = "") -> dict:
+         )
+ 
+     # Columnas de días de la semana (opcionales)
+     _dias = ['Dom', 'Lun', 'Mar', 'Mie', 'Jue', 'Vie', 'Sab']
+     idx_ctd   = {}
+     idx_vtas  = {}
+     for d in _dias:
+         try: idx_ctd[d] = col(f'Ctd {d}')
+         except: 
+             try: idx_ctd[d] = col(f'Cnt {d}')
+             except: idx_ctd[d] = None
+         try: idx_vtas[d] = col(f'Ventas {d}')
+         except: idx_vtas[d] = None
+ 
+     records = []
+     for row in ws.iter_rows(min_row=2, values_only=True):
+         producto  = str(row[idx_producto]).strip() if row[idx_producto] else None
+         tienda    = str(row[idx_tienda]).strip()   if row[idx_tienda]   else None
+         # Semana: valor simple como 50, 51 etc
+         try:
+             semana_num = int(float(row[idx_semana])) if row[idx_semana] is not None else None
+         except:
+             semana_num = None
+ 
+         # Fecha: puede venir como datetime o string MM/DD/YYYY
+-        from datetime import datetime as _dt
+         fecha_raw = row[idx_fecha]
+         anio = None
+         if hasattr(fecha_raw, 'strftime'):
+             fecha = fecha_raw.strftime('%d/%m/%Y')
+             anio  = fecha_raw.year
+         elif fecha_raw:
+             s_fecha = str(fecha_raw).strip()
+             for fmt in ('%m/%d/%Y','%d/%m/%Y','%Y-%m-%d'):
+                 try:
+                     dt   = _dt.strptime(s_fecha, fmt)
+                     fecha = dt.strftime('%d/%m/%Y')
+                     anio  = dt.year
+                     break
+                 except:
+                     continue
+             else:
+                 fecha = s_fecha
+         else:
+             fecha = ''
+ 
+         if not producto or not tienda or not semana_num: continue
  
          records.append({
              'producto':   producto,
@@ -264,6 +311,37 @@ index 5c50810cdcdd59ad0d7875dbdd7964c598f04808..a8f43b1effc3b0bd04d9ada41c2ad9b7
      # Agregaciones de inventario por producto (suma de todas las tiendas)
      inventario_por_producto = {}
      for p in productos:
+         total_inv = sum(totales_prod_tienda[t][p].get('inventario', 0) for t in tiendas)
+         inventario_por_producto[p] = {
+             'total': round(total_inv),
+             'tiendas': {t: round(totales_prod_tienda[t][p].get('inventario', 0)) 
+                        for t in tiendas if totales_prod_tienda[t][p].get('inventario', 0) > 0}
+         }
  
-EOF
-)
++    wb.close()
++
+     return {
+         'semanas':           semanas,
+         'tiendas':           tiendas,
+         'productos':         productos,
+         'fecha_por_semana':  fecha_por_semana,
+         'data':              {t: {str(s): v for s, v in sv2.items()} for t, sv2 in result.items()},
+         'totales_tienda':    {t: dict(v) for t, v in totales_tienda.items()},
+         'raw_semana':        {t: {str(s): dict(v) for s, v in sv.items()} for t, sv in raw_semana.items()},
+         'raw_prod_semana':   raw_prod_semana,
+         'totales_prod_tienda': {t: {p: dict(v) for p, v in pd.items()} for t, pd in totales_prod_tienda.items()},
+         'inventario_por_tienda': inventario_por_tienda,
+         'inventario_por_producto': inventario_por_producto,
+     }
+ 
+ try:
+     DATA = cargar_datos()
+ except Exception as e:
+     st.error(f"❌ Error cargando datos: {e}")
+     st.stop()
+ 
+ HTML = r"""<!DOCTYPE html>
+ <html lang="es">
+ <head>
+ <meta charset="UTF-8">
+ <meta name="viewport" content="width=device-width,initial-scale=1">
