@@ -822,9 +822,9 @@ function render(){
     var name=o.p.replace('BQT ',''), v=o.v;
     mermaRows += '<tr><td>'+name+'</td><td>'+fmt(v.emb)+'</td><td class="'+(v.m3>0?'red':'')+'">'+fmt(v.m3)+'</td><td class="'+(v.pct_merma>0?'red':'')+'">'+v.pct_merma+'%</td></tr>';
   });
-  prodArr.slice().sort(function(a,b){ return b.v.avg-a.v.avg; }).forEach(function(o){
+  prodArr.slice().sort(function(a,b){ return b.v.v3-a.v.v3; }).forEach(function(o){
     var name=o.p.replace('BQT ',''), v=o.v;
-    avgRows += '<tr><td>'+name+'</td><td>'+Math.round(v.avg)+'</td></tr>';
+    avgRows += '<tr><td>'+name+'</td><td>'+Math.round(v.v3/3)+'</td></tr>';
   });
   prodArr.slice().sort(function(a,b){ return b.v.proj-a.v.proj; }).forEach(function(o){
     var name=o.p.replace('BQT ',''), v=o.v;
@@ -834,7 +834,7 @@ function render(){
   histRows  += '<tr class="total"><td>Total</td><td>'+fmt(totV12)+'</td><td>'+fmt(totV3)+'</td></tr>';
   var pct_merma_total = totEmb2 > 0 ? Math.round(totM3/totEmb2*100) : 0;
   mermaRows += '<tr class="total"><td>Total</td><td>'+fmt(totEmb)+'</td><td class="red">'+fmt(totM3)+'</td><td class="red">'+pct_merma_total+'%</td></tr>';
-  avgRows   += '<tr class="total"><td>Total</td><td>'+Math.round(totAvg)+'</td></tr>';
+  avgRows   += '<tr class="total"><td>Total</td><td>'+Math.round(totV3/3)+'</td></tr>';
   projRows  += '<tr class="total"><td>Total</td><td>'+fmt(totProj)+'</td></tr>';
   document.getElementById('tHist').innerHTML  = histRows;
   document.getElementById('tMerma').innerHTML = mermaRows;
