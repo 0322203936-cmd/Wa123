@@ -1,3 +1,4 @@
+ (cd "$(git rev-parse --show-toplevel)" && git apply --3way <<'EOF' 
 diff --git a/app.py b/app.py
 index 5c50810cdcdd59ad0d7875dbdd7964c598f04808..0750cfb29915d46ef2f0c36cb2d4af90f8cc5e8c 100644
 --- a/app.py
@@ -345,3 +346,6 @@ index 5c50810cdcdd59ad0d7875dbdd7964c598f04808..0750cfb29915d46ef2f0c36cb2d4af90
  <head>
  <meta charset="UTF-8">
  <meta name="viewport" content="width=device-width,initial-scale=1">
+ 
+EOF
+)
