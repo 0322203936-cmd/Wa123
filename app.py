@@ -2,11 +2,28 @@
 Walmex Dashboard — CFBC
 Reporte ejecutivo estilo Walmart
 """
-import json, base64, openpyxl
+import hashlib
+import json
+import base64
+import openpyxl
+import pickle
 from collections import defaultdict
 from pathlib import Path
 import streamlit as st
 import streamlit.components.v1 as components
+
+# Caché en disco: mismo Excel = carga al instante (al abrir, al cambiar código o restablecer)
+_CACHE_DIR = Path(__file__).resolve().parent / ".wa123_cache"
+
+def _excel_cache_key():
+    paths = ["Analisis_Walmart.xlsx", "Analisis Walmart.xlsx"]
+    excel_path = next((p for p in paths if Path(p).exists()), None)
+    if not excel_path:
+        return None, None, None
+    p = Path(excel_path).resolve()
+    mtime = p.stat().st_mtime
+    key = hashlib.md5(f"{p}{mtime}".encode()).hexdigest()[:16]
+    return str(p), mtime, key
 
 st.set_page_config(page_title="Walmex · CFBC", layout="wide", initial_sidebar_state="collapsed")
 
@@ -35,10 +52,15 @@ iframe { display: block !important; margin: 0 !important; border: none !importan
 
 @st.cache_data(ttl=3600, show_spinner=False)
 def cargar_datos(url: str = "") -> dict:
-    paths = ["Analisis_Walmart.xlsx", "Analisis Walmart.xlsx"]
-    excel_path = next((p for p in paths if Path(p).exists()), None)
+    excel_path, _, cache_key = _excel_cache_key()
     if not excel_path:
         raise FileNotFoundError("No se encontró Analisis_Walmart.xlsx. Súbelo al repo de GitHub.")
+    # Caché en disco: si el Excel no cambió, cargar al instante
+    _CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    data_cache_file = _CACHE_DIR / f"data_{cache_key}.pkl"
+    if data_cache_file.exists():
+        with open(data_cache_file, "rb") as f:
+            return pickle.load(f)
     wb = openpyxl.load_workbook(excel_path, data_only=True)
     ws = wb['Data']
 
@@ -301,7 +323,7 @@ def cargar_datos(url: str = "") -> dict:
                        for t in tiendas if totales_prod_tienda[t][p].get('inventario', 0) > 0}
         }
 
-    return {
+    result_dict = {
         'semanas':           semanas,
         'tiendas':           tiendas,
         'productos':         productos,
@@ -314,6 +336,12 @@ def cargar_datos(url: str = "") -> dict:
         'inventario_por_tienda': inventario_por_tienda,
         'inventario_por_producto': inventario_por_producto,
     }
+    try:
+        with open(data_cache_file, "wb") as f:
+            pickle.dump(result_dict, f)
+    except Exception:
+        pass
+    return result_dict
 
 try:
     DATA = cargar_datos()
@@ -1380,4 +1408,17 @@ def build_html():
     ).decode('ascii')
     return HTML.replace('__DATA_JSON__', data_json)
 
-components.html(build_html(), height=1400, scrolling=True)
+# Caché del HTML: evita reconstruir el JSON gigante en cada rerun
+_, _, html_cache_key = _excel_cache_key()
+html_cache_file = _CACHE_DIR / f"html_{html_cache_key}.html" if html_cache_key else None
+if html_cache_file and html_cache_file.exists():
+    html_content = html_cache_file.read_text(encoding="utf-8")
+else:
+    html_content = build_html()
+    if html_cache_file:
+        try:
+            _CACHE_DIR.mkdir(parents=True, exist_ok=True)
+            html_cache_file.write_text(html_content, encoding="utf-8")
+        except Exception:
+            pass
+components.html(html_content, height=1400, scrolling=True)
