@@ -209,7 +209,7 @@ def cargar_datos(url: str = "") -> dict:
                 
                 prod_data[p] = {
                     'v12': round(v12), 'v3': round(v3),
-                    'n12': len(last12),
+                    'n12': min(s % 100 if s > 9999 else s, 12),
                     'emb': round(emb3), 'm3': round(m3),
                     'avg': round(avg, 1), 'proj': round(proj),
                     'pct_merma': round(m3/emb3*100) if emb3 > 0 else 0,
