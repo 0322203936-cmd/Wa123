@@ -443,12 +443,12 @@ html,body{height:auto;overflow-y:auto}
       <table class="t"><thead><tr><th>Tienda</th><th>UNIDADES</th><th>$</th><th>CANTIDAD</th><th>%</th></tr></thead>
       <tbody id="tMermaT"></tbody></table>
     </div>
-    <div class="box">
+    <div class="box" id="boxAvgT" style="display:none">
       <div class="box-hdr" id="avgTTitle">Venta Promedio Semanal</div>
       <table class="t"><thead><tr><th>Producto</th><th>Venta</th><th>Unidades</th></tr></thead>
       <tbody id="tAvgT"></tbody></table>
     </div>
-    <div class="box">
+    <div class="box" id="boxProjT" style="display:none">
       <div class="box-hdr" id="projTTitle">Comparacion Ultimas 3 Semanas</div>
       <table class="t"><thead><tr><th>Merma Producto</th><th>Unidades</th><th>Cantidad</th></tr></thead>
       <tbody id="tProjT"></tbody></table>
@@ -1035,6 +1035,11 @@ function renderTienda(){
   document.getElementById('tMermaT').innerHTML = mermaRows;
   document.getElementById('tAvgT').innerHTML   = avgRows;
   document.getElementById('tProjT').innerHTML  = projRows;
+
+  // Mostrar/ocultar tablas inferiores según si hay tienda seleccionada
+  var showBottom = state.tiendaT ? 'block' : 'none';
+  document.getElementById('boxAvgT').style.display  = showBottom;
+  document.getElementById('boxProjT').style.display = showBottom;
 }
 
 // ─── INVENTARIO ─────────────────────────────────────────────────────────────
