@@ -209,6 +209,7 @@ def cargar_datos(url: str = "") -> dict:
                 
                 prod_data[p] = {
                     'v12': round(v12), 'v3': round(v3),
+                    'n12': len(last12),
                     'emb': round(emb3), 'm3': round(m3),
                     'avg': round(avg, 1), 'proj': round(proj),
                     'pct_merma': round(m3/emb3*100) if emb3 > 0 else 0,
@@ -421,7 +422,7 @@ html,body{height:auto;overflow-y:auto}
     </div>
     <div class="box">
       <div class="box-hdr">Venta Promedio Semanal</div>
-      <table class="t"><thead><tr><th>Producto</th><th>Promedio</th></tr></thead>
+      <table class="t"><thead><tr><th>Producto</th><th>Prom 12 Sem</th><th>Prom 3 Sem</th></tr></thead>
       <tbody id="tAvg"></tbody></table>
     </div>
     <div class="box">
@@ -778,7 +779,7 @@ function getD(){
   var prods = DATA.productos;
   var merged = {};
   prods.forEach(function(p){
-    var v12=0,v3=0,emb=0,m3=0,cfbc=0,retail=0;
+    var v12=0,v3=0,emb=0,m3=0,cfbc=0,retail=0,n12=0;
     tiendas.forEach(function(t){
       sems.forEach(function(s){
         var key = String(s);
@@ -789,13 +790,15 @@ function getD(){
         m3    += d.m3    || 0;
         cfbc  += d.cfbc  || 0;
         retail+= d.retail|| 0;
+        if((d.n12||0) > n12) n12 = d.n12;
       });
     });
+    if(n12 < 1) n12 = 1;
     var avg = sems.length > 0 ? v3 / sems.length : 0;
     var merma_ratio = emb > 0 ? m3/emb : 0;
     var proj = merma_ratio < 1 ? avg/(1-merma_ratio) : avg;
     merged[p] = {
-      v12: v12, v3: v3, emb: emb, m3: m3,
+      v12: v12, v3: v3, n12: n12, emb: emb, m3: m3,
       avg: avg, proj: proj,
       pct_merma: emb > 0 ? Math.round(m3/emb*100) : 0,
       cfbc: cfbc, retail: retail
@@ -822,9 +825,10 @@ function render(){
     var name=o.p.replace('BQT ',''), v=o.v;
     mermaRows += '<tr><td>'+name+'</td><td>'+fmt(v.emb)+'</td><td class="'+(v.m3>0?'red':'')+'">'+fmt(v.m3)+'</td><td class="'+(v.pct_merma>0?'red':'')+'">'+v.pct_merma+'%</td></tr>';
   });
-  prodArr.slice().sort(function(a,b){ return b.v.v3-a.v.v3; }).forEach(function(o){
+  prodArr.slice().sort(function(a,b){ return b.v.v12-a.v.v12; }).forEach(function(o){
     var name=o.p.replace('BQT ',''), v=o.v;
-    avgRows += '<tr><td>'+name+'</td><td>'+Math.round(v.v3/3)+'</td></tr>';
+    var div12 = (v.n12 && v.n12 > 0) ? v.n12 : 1;
+    avgRows += '<tr><td>'+name+'</td><td>'+Math.round(v.v12/div12)+'</td><td>'+Math.round(v.v3/3)+'</td></tr>';
   });
   prodArr.slice().sort(function(a,b){ return b.v.proj-a.v.proj; }).forEach(function(o){
     var name=o.p.replace('BQT ',''), v=o.v;
@@ -834,7 +838,9 @@ function render(){
   histRows  += '<tr class="total"><td>Total</td><td>'+fmt(totV12)+'</td><td>'+fmt(totV3)+'</td></tr>';
   var pct_merma_total = totEmb2 > 0 ? Math.round(totM3/totEmb2*100) : 0;
   mermaRows += '<tr class="total"><td>Total</td><td>'+fmt(totEmb)+'</td><td class="red">'+fmt(totM3)+'</td><td class="red">'+pct_merma_total+'%</td></tr>';
-  avgRows   += '<tr class="total"><td>Total</td><td>'+Math.round(totV3/3)+'</td></tr>';
+  var totDiv12 = 1;
+  prodArr.forEach(function(o){ if((o.v.n12||0) > totDiv12) totDiv12 = o.v.n12; });
+  avgRows   += '<tr class="total"><td>Total</td><td>'+Math.round(totV12/totDiv12)+'</td><td>'+Math.round(totV3/3)+'</td></tr>';
   projRows  += '<tr class="total"><td>Total</td><td>'+fmt(totProj)+'</td></tr>';
   document.getElementById('tHist').innerHTML  = histRows;
   document.getElementById('tMerma').innerHTML = mermaRows;
