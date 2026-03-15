@@ -58,9 +58,9 @@ def cargar_datos(url: str = "") -> dict:
     # Caché en disco: si el Excel no cambió, cargar al instante
     _CACHE_DIR.mkdir(parents=True, exist_ok=True)
     data_cache_file = _CACHE_DIR / f"data_{cache_key}.pkl"
-    if data_cache_file.exists():
-        with open(data_cache_file, "rb") as f:
-            return pickle.load(f)
+    # if data_cache_file.exists():
+    #     with open(data_cache_file, "rb") as f:
+    #         return pickle.load(f)
     wb = openpyxl.load_workbook(excel_path, data_only=True)
     ws = wb['Data']
 
@@ -1441,4 +1441,3 @@ else:
         except Exception:
             pass
 components.html(html_content, height=1400, scrolling=True)
-
