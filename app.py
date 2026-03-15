@@ -22,9 +22,7 @@ def _excel_cache_key():
         return None, None, None
     p = Path(excel_path).resolve()
     mtime = p.stat().st_mtime
-    # Incluir mtime del propio app.py para que el caché se invalide al modificar el código
-    app_mtime = Path(__file__).resolve().stat().st_mtime
-    key = hashlib.md5(f"{p}{mtime}{app_mtime}".encode()).hexdigest()[:16]
+    key = hashlib.md5(f"{p}{mtime}".encode()).hexdigest()[:16]
     return str(p), mtime, key
 
 st.set_page_config(page_title="Walmex · CFBC", layout="wide", initial_sidebar_state="collapsed")
@@ -60,9 +58,9 @@ def cargar_datos(url: str = "") -> dict:
     # Caché en disco: si el Excel no cambió, cargar al instante
     _CACHE_DIR.mkdir(parents=True, exist_ok=True)
     data_cache_file = _CACHE_DIR / f"data_{cache_key}.pkl"
-    if data_cache_file.exists():
-        with open(data_cache_file, "rb") as f:
-            return pickle.load(f)
+    # if data_cache_file.exists():
+    #     with open(data_cache_file, "rb") as f:
+    #         return pickle.load(f)
     wb = openpyxl.load_workbook(excel_path, data_only=True)
     ws = wb['Data']
 
