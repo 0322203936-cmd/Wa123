@@ -94,6 +94,12 @@ def cargar_datos(url: str = "") -> dict:
         try: idx_venta_cfbc = col(_n); break
         except: pass
 
+    idx_venta_wmx = None
+    for _n in ['Venta WMX / Precio Costo (Vendido)', 'Venta WMX/Precio Costo (Vendido)',
+               'Venta WMX', 'WMX']:
+        try: idx_venta_wmx = col(_n); break
+        except: pass
+
     idx_retail_vc = None
     for _n in ['Suma de Retail VC Tienda', 'Retail VC Tienda',
                'Suma Retail VC Tienda', 'Retail VC', 'Suma de Retail VC',
@@ -181,6 +187,7 @@ def cargar_datos(url: str = "") -> dict:
             'embarque_u': sv(row[idx_embarque]),
             'merma_u':    sv(row[idx_merma_vc]),
             'venta_cfbc': sv(row[idx_venta_cfbc]) if idx_venta_cfbc is not None else 0,
+            'venta_wmx':  sv(row[idx_venta_wmx]) if idx_venta_wmx is not None else 0,
             'retail_vc':  sv(row[idx_retail_vc]) if idx_retail_vc is not None else 0,
             'inventario': sv(row[idx_inventario]) if idx_inventario is not None else 0,
             **{f'ctd_{d.lower()}':  sv(row[idx_ctd[d]])  if idx_ctd[d]  is not None else 0 for d in _dias},
@@ -213,6 +220,7 @@ def cargar_datos(url: str = "") -> dict:
         by_stp[r['semana']][r['tienda']][r['producto']]['embarque_u'] += r['embarque_u']
         by_stp[r['semana']][r['tienda']][r['producto']]['merma_u']    += r['merma_u']
         by_stp[r['semana']][r['tienda']][r['producto']]['venta_cfbc'] += r['venta_cfbc']
+        by_stp[r['semana']][r['tienda']][r['producto']]['venta_wmx']  += r['venta_wmx']
         by_stp[r['semana']][r['tienda']][r['producto']]['retail_vc']  += r['retail_vc']
         for d in ['dom','lun','mar','mie','jue','vie','sab']:
             by_stp[r['semana']][r['tienda']][r['producto']][f'ctd_{d}']  += r.get(f'ctd_{d}', 0)
@@ -253,6 +261,7 @@ def cargar_datos(url: str = "") -> dict:
                     'avg': round(avg, 1), 'proj': round(proj),
                     'pct_merma': round(m3/emb3*100) if emb3 > 0 else 0,
                     'cfbc': round(cfbc3), 'retail': round(retail3),
+                    'wmx': round(sum(by_stp[sem][t][p].get('venta_wmx', 0) for sem in last3))
                 }
             result[t][s] = prod_data
 
@@ -265,16 +274,21 @@ def cargar_datos(url: str = "") -> dict:
     for r in records:
         totales_tienda[r['tienda']]['embarque_u'] += r['embarque_u']
         totales_tienda[r['tienda']]['venta_cfbc'] += r['venta_cfbc']
+        totales_tienda[r['tienda']]['venta_wmx']  += r['venta_wmx']
         totales_tienda[r['tienda']]['merma_u']    += r['merma_u']
         totales_tienda[r['tienda']]['retail_vc']  += r['retail_vc']
         totales_tienda[r['tienda']]['inventario'] += r['inventario']
+        totales_tienda[r['tienda']]['ventas_u']   += r['ventas_u']
         raw_semana[r['tienda']][r['semana']]['embarque_u'] += r['embarque_u']
         raw_semana[r['tienda']][r['semana']]['venta_cfbc'] += r['venta_cfbc']
+        raw_semana[r['tienda']][r['semana']]['venta_wmx']  += r['venta_wmx']
         raw_semana[r['tienda']][r['semana']]['merma_u']    += r['merma_u']
         raw_semana[r['tienda']][r['semana']]['retail_vc']  += r['retail_vc']
         raw_semana[r['tienda']][r['semana']]['inventario'] += r['inventario']
+        raw_semana[r['tienda']][r['semana']]['ventas_u']   += r['ventas_u']
         totales_prod_tienda[r['tienda']][r['producto']]['embarque_u'] += r['embarque_u']
         totales_prod_tienda[r['tienda']][r['producto']]['venta_cfbc'] += r['venta_cfbc']
+        totales_prod_tienda[r['tienda']][r['producto']]['venta_wmx']  += r['venta_wmx']
         totales_prod_tienda[r['tienda']][r['producto']]['merma_u']    += r['merma_u']
         totales_prod_tienda[r['tienda']][r['producto']]['retail_vc']  += r['retail_vc']
         totales_prod_tienda[r['tienda']][r['producto']]['ventas_u']   += r['ventas_u']
@@ -291,10 +305,11 @@ def cargar_datos(url: str = "") -> dict:
             raw_prod_semana[t][str(s)] = {}
             for p in productos:
                 d = by_stp[s][t][p]
-                if any(d[k] for k in ['ventas_u','venta_cfbc','merma_u','retail_vc','embarque_u','inventario']):
+                if any(d[k] for k in ['ventas_u','venta_cfbc','venta_wmx','merma_u','retail_vc','embarque_u','inventario']):
                     raw_prod_semana[t][str(s)][p] = {
                         'ventas_u':   round(d['ventas_u']),
                         'venta_cfbc': round(d['venta_cfbc']),
+                        'venta_wmx':  round(d['venta_wmx']),
                         'merma_u':    round(d['merma_u']),
                         'retail_vc':  round(d['retail_vc']),
                         'embarque_u': round(d['embarque_u']),
@@ -951,28 +966,32 @@ function renderTienda(){
   var isAll = (!state.semanas_sel || state.semanas_sel.length === 0);
 
   // ── Obtener totales por tienda según semanas activas ──
-  var totEmb=0, totCfbc=0, totMerma=0, totRetail=0;
+  var totEmb=0, totCfbc=0, totWmx=0, totMerma=0, totRetail=0, totVentasU=0;
   var tiendaData = [];
 
   tiendas.forEach(function(tienda){
-    var emb=0, cfbc=0, merma=0, retail=0;
+    var emb=0, cfbc=0, wmx=0, merma=0, retail=0, ventas_u=0;
     if(isAll){
       var tot = (DATA.totales_tienda && DATA.totales_tienda[tienda]) || {};
       emb    = tot.embarque_u || 0;
       cfbc   = tot.venta_cfbc || 0;
+      wmx    = tot.venta_wmx  || 0;
       merma  = tot.merma_u    || 0;
       retail = tot.retail_vc  || 0;
+      ventas_u = tot.ventas_u || 0;
     } else {
       sems.forEach(function(s){
         var raw = (DATA.raw_semana && DATA.raw_semana[tienda] && DATA.raw_semana[tienda][String(s)]) || {};
         emb    += raw.embarque_u || 0;
         cfbc   += raw.venta_cfbc || 0;
+        wmx    += raw.venta_wmx  || 0;
         merma  += raw.merma_u    || 0;
         retail += raw.retail_vc  || 0;
+        ventas_u += raw.ventas_u || 0;
       });
     }
-    totEmb+=emb; totCfbc+=cfbc; totMerma+=merma; totRetail+=retail;
-    tiendaData.push({tienda:tienda, emb:emb, cfbc:cfbc, merma:merma, retail:retail});
+    totEmb+=emb; totCfbc+=cfbc; totWmx+=wmx; totMerma+=merma; totRetail+=retail; totVentasU+=ventas_u;
+    tiendaData.push({tienda:tienda, emb:emb, cfbc:cfbc, wmx:wmx, merma:merma, retail:retail, ventas_u:ventas_u});
   });
 
   // ── TOP VENTA: ordenar por VENTA (cfbc) de mayor a menor ──
@@ -982,9 +1001,9 @@ function renderTienda(){
     var sel = state.tiendaT === t.tienda;
     var style = sel ? 'style="background:#e8f0fe;font-weight:700;cursor:pointer"' : 'style="cursor:pointer"';
     histRows += '<tr '+style+' onclick="selTiendaT(\''+t.tienda.replace(/'/g,"\\'")+'\')">'
-      +'<td>'+t.tienda+'</td><td>'+fmt(t.emb)+'</td><td>$'+fmt(t.cfbc)+'</td><td>'+pct+'%</td></tr>';
+      +'<td>'+t.tienda+'</td><td>'+fmt(t.ventas_u)+'</td><td>$'+fmt(t.cfbc)+'</td><td>$'+fmt(t.wmx)+'</td><td>'+pct+'%</td></tr>';
   });
-  histRows += '<tr class="total"><td>Total</td><td>'+fmt(totEmb)+'</td><td>$'+fmt(totCfbc)+'</td><td>100%</td></tr>';
+  histRows += '<tr class="total"><td>Total</td><td>'+fmt(totVentasU)+'</td><td>$'+fmt(totCfbc)+'</td><td>$'+fmt(totWmx)+'</td><td>100%</td></tr>';
 
   // ── TOP MERMA: ordenar por RETAIL (cantidad $) de mayor a menor ──
   var mermaRows='';
