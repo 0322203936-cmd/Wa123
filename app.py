@@ -500,7 +500,7 @@ html,body{height:auto;overflow-y:auto}
   <div class="grid" id="viewTienda" style="display:none">
     <div class="box">
       <div class="box-hdr">Top Venta</div>
-      <table class="t"><thead><tr><th>Tienda</th><th>UNIDADES</th><th>VENTA</th><th>%</th></tr></thead>
+      <table class="t"><thead><tr><th>Tienda</th><th>UNIDADES</th><th>VENTA CFBC</th><th>VENTA WMX</th><th>%</th></tr></thead>
       <tbody id="tHistT"></tbody></table>
     </div>
     <div class="box">
