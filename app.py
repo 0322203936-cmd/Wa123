@@ -338,11 +338,48 @@ def cargar_datos(url: str = "") -> dict:
                        for t in tiendas if totales_prod_tienda[t][p].get('inventario', 0) > 0}
         }
 
+    COSTOS_ENTREGA = {
+        'BQT ALSTROEMERI 8T': 15.00,
+        'BQT GIRASOL 6T': 10.00,
+        'BQT LILI ASIATIC 6T': 15.00,
+        'BQT MINI CLAVEL 8T': 15.00,
+        'BQT MIXTO 12T': 23.00,
+        'BQT MIXTO 15T': 23.00,
+        'BQT MIXTO 18 T': 10.00,
+        'BQT MIXTO 9T': 15.00,
+        'BQT ROSAS 12T': 20.00,
+        'BQT ROSAS 12T BAJA': 20.00,
+        'BQT ROSAS 6T': 15.00,
+        'BQT SNAPDRAGON 8T': 10.00,
+        'BQT ROSAS 6T BAJA': 10.00,
+    }
+
+    RUTAS = {
+        'SC NUEVO MEXICALI': 'MXL 2',
+        'SC TIJUANA 2000': 'Ruta 2000',
+        'SC ENSENADA': 'ENS',
+        'SC ENSENADA CENTRO': 'ENS',
+        'SC PLAYAS DE TIJUANA': 'Rutas Playas',
+        'SC LOMAS DE SANTA FE': 'Rutas Playas',
+        'SC ROSARITO': 'Rutas Playas',
+        'SC MACROPLAZA INSURGENTES': 'Ruta 2000',
+        'SC DIAZ ORDAZ': 'Ruta 2000',
+        'SC TIJUANA HIPODROMO': 'Ruta 2000',
+        'SC PACIFICO': 'Rutas Playas',
+        'SC MEXICALI NOVENA': 'MXL 2',
+        'SC PLAZA SAN PEDRO': 'MXL 2',
+        'SC GALERIAS DEL VALLE': 'MXL 1',
+        'SC MEXICALI': 'MXL 1',
+        'SC TECATE GARITA': 'MXL 1',
+    }
+
     result_dict = {
         'semanas':           semanas,
         'tiendas':           tiendas,
         'productos':         productos,
         'fecha_por_semana':  fecha_por_semana,
+        'rutas':             RUTAS,
+        'costos_entrega':    COSTOS_ENTREGA,
         'data':              {t: {str(s): v for s, v in sv2.items()} for t, sv2 in result.items()},
         'totales_tienda':    {t: dict(v) for t, v in totales_tienda.items()},
         'raw_semana':        {t: {str(s): dict(v) for s, v in sv.items()} for t, sv in raw_semana.items()},
@@ -471,6 +508,7 @@ html,body{height:auto;overflow-y:auto}
       <button onclick="setView('producto')" id="btnProd" style="padding:6px 12px; background:#0071ce; color:white; border:none; border-radius:4px; cursor:pointer; font-weight:600;">📊 Proyección</button>
       <button onclick="setView('tienda')" id="btnTiend" style="padding:6px 12px; background:#ccc; color:#333; border:none; border-radius:4px; cursor:pointer; font-weight:600;">🏪 Tienda</button>
       <button onclick="setView('inventario')" id="btnInv" style="padding:6px 12px; background:#ccc; color:#333; border:none; border-radius:4px; cursor:pointer; font-weight:600;">📦 Inventario Actual</button>
+      <button onclick="setView('gastos')" id="btnGastos" style="padding:6px 12px; background:#ccc; color:#333; border:none; border-radius:4px; cursor:pointer; font-weight:600;">💰 Gastos</button>
     </div>
   </div>
 
@@ -547,6 +585,24 @@ html,body{height:auto;overflow-y:auto}
       <table class="t">
         <thead><tr><th>Producto</th><th>Inventario Total</th></tr></thead>
         <tbody id="tInvProducto"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Vista Gastos -->
+  <div class="grid" id="viewGastos" style="display:none">
+    <div class="box">
+      <div class="box-hdr">Gasto Total por Ruta</div>
+      <table class="t">
+        <thead><tr><th>Ruta</th><th>Unidades</th><th>Gasto ($)</th><th>% del Total</th></tr></thead>
+        <tbody id="tGastosRuta"></tbody>
+      </table>
+    </div>
+    <div class="box" id="boxGastosDetalle" style="display:none">
+      <div class="box-hdr" id="gastosDetalleTitle">Detalle por Producto</div>
+      <table class="t">
+        <thead><tr><th>Producto</th><th>Unidades</th><th>Costo / U</th><th>Gasto ($)</th></tr></thead>
+        <tbody id="tGastosDetalle"></tbody>
       </table>
     </div>
   </div>
@@ -934,14 +990,17 @@ function setView(v){
   document.getElementById('btnTiend').style.color = v==='tienda' ? 'white' : '#333';
   document.getElementById('btnInv').style.background = v==='inventario' ? '#0071ce' : '#ccc';
   document.getElementById('btnInv').style.color = v==='inventario' ? 'white' : '#333';
+  document.getElementById('btnGastos').style.background = v==='gastos' ? '#0071ce' : '#ccc';
+  document.getElementById('btnGastos').style.color = v==='gastos' ? 'white' : '#333';
   document.getElementById('viewProducto').style.display = v==='producto' ? 'grid' : 'none';
   document.getElementById('viewTienda').style.display = v==='tienda' ? 'grid' : 'none';
   document.getElementById('viewInventario').style.display = v==='inventario' ? 'grid' : 'none';
+  document.getElementById('viewGastos').style.display = v==='gastos' ? 'grid' : 'none';
   
-  // Ocultar filtros de tienda en vista Tienda e Inventario
+  // Ocultar filtros de tienda en vista Tienda, Inventario y Gastos
   var tiendaDropWrap = document.getElementById('tiendaDropWrap');
   var tiendaLabel = Array.from(document.querySelectorAll('.ctrl label')).find(el => el.textContent === 'Tienda:');
-  if(v==='tienda' || v==='inventario'){
+  if(v==='tienda' || v==='inventario' || v==='gastos'){
     if(tiendaDropWrap) tiendaDropWrap.style.display = 'none';
     if(tiendaLabel) tiendaLabel.style.display = 'none';
   } else {
@@ -951,8 +1010,104 @@ function setView(v){
   
   if(v==='tienda'){ state.tiendaT = null; renderTienda(); }
   else if(v==='inventario'){ state.invMode = null; state.invSelected = null; renderInventario(); }
+  else if(v==='gastos'){ state.rutaSelected = null; renderGastos(); }
   else render();
 }
+
+function selRuta(r){
+  state.rutaSelected = (state.rutaSelected === r) ? null : r;
+  renderGastos();
+}
+
+function renderGastos(){
+  var sems = getSemanasActivas();
+  var rutas = DATA.rutas || {};
+  var costos = DATA.costos_entrega || {};
+  var data = DATA.data;
+  
+  var gastosPorRuta = {};
+  var totalGasto = 0;
+  
+  // Initialize routes
+  Object.values(rutas).forEach(function(r) {
+    if(!gastosPorRuta[r]) gastosPorRuta[r] = { unidades: 0, gasto: 0, productos: {} };
+  });
+  
+  // Accumulate
+  Object.keys(data).forEach(function(t) {
+    var ruta = rutas[t];
+    if(!ruta) return;
+    
+    sems.forEach(function(s) {
+      var prodData = data[t][String(s)];
+      if(!prodData) return;
+      
+      Object.keys(prodData).forEach(function(p) {
+        var emb = prodData[p].emb || 0;
+        if(emb > 0) {
+          var costo = costos[p] || 0;
+          var gastoExtra = emb * costo;
+          
+          gastosPorRuta[ruta].unidades += emb;
+          gastosPorRuta[ruta].gasto += gastoExtra;
+          totalGasto += gastoExtra;
+          
+          if(!gastosPorRuta[ruta].productos[p]) {
+            gastosPorRuta[ruta].productos[p] = { unidades: 0, costo: costo, gasto: 0 };
+          }
+          gastosPorRuta[ruta].productos[p].unidades += emb;
+          gastosPorRuta[ruta].productos[p].gasto += gastoExtra;
+        }
+      });
+    });
+  });
+  
+  // Render Table: Ruta Summary
+  var rutaRows = '';
+  var rutaArr = Object.keys(gastosPorRuta).map(function(r) {
+    return { r: r, v: gastosPorRuta[r] };
+  }).sort(function(a,b) { return b.v.gasto - a.v.gasto; });
+  
+  rutaArr.forEach(function(o) {
+    var pct = totalGasto > 0 ? Math.round((o.v.gasto / totalGasto) * 100) : 0;
+    var bg = (state.rutaSelected === o.r) ? 'background:#e8f0fe;' : '';
+    rutaRows += '<tr style="'+bg+'cursor:pointer" onclick="selRuta(\\''+o.r+'\\')">' +
+                '<td><b>'+o.r+'</b></td>' +
+                '<td>'+fmt(o.v.unidades)+'</td>' +
+                '<td>$'+fmt(o.v.gasto)+'</td>' +
+                '<td>'+pct+'%</td></tr>';
+  });
+  rutaRows += '<tr class="total"><td>Total</td><td></td><td>$'+fmt(totalGasto)+'</td><td>100%</td></tr>';
+  document.getElementById('tGastosRuta').innerHTML = rutaRows;
+  
+  // Render Table: Detalle
+  var boxDetalle = document.getElementById('boxGastosDetalle');
+  if(state.rutaSelected && gastosPorRuta[state.rutaSelected]) {
+    var detTitle = document.getElementById('gastosDetalleTitle');
+    detTitle.innerText = 'Detalle por Producto: ' + state.rutaSelected;
+    
+    var prods = gastosPorRuta[state.rutaSelected].productos;
+    var prodRows = '';
+    
+    var prodArr = Object.keys(prods).map(function(p) {
+      return { p: p, v: prods[p] };
+    }).sort(function(a,b) { return b.v.gasto - a.v.gasto; });
+    
+    prodArr.forEach(function(o) {
+      var name = o.p.replace('BQT ', '');
+      prodRows += '<tr><td>'+name+'</td>' +
+                  '<td>'+fmt(o.v.unidades)+'</td>' +
+                  '<td>$'+parseFloat(o.v.costo.toFixed(2))+'</td>' +
+                  '<td>$'+fmt(o.v.gasto)+'</td></tr>';
+    });
+    
+    document.getElementById('tGastosDetalle').innerHTML = prodRows;
+    boxDetalle.style.display = 'block';
+  } else {
+    boxDetalle.style.display = 'none';
+  }
+}
+
 
 function selTiendaT(t){
   // Toggle: si ya está seleccionada, deseleccionar
