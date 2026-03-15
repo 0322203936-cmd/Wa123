@@ -1041,7 +1041,7 @@ function renderTienda(){
     var prodItems = prods.map(function(p){
       if(isAll){
         var d = (DATA.totales_prod_tienda && DATA.totales_prod_tienda[tSel] && DATA.totales_prod_tienda[tSel][p]) || {};
-        return { p:p, venta:d.venta_cfbc||0, unid:d.embarque_u||0, mermaU:d.merma_u||0, mermaR:d.retail_vc||0, dias:d };
+        return { p:p, venta:d.venta_cfbc||0, unid:d.ventas_u||0, mermaU:d.merma_u||0, mermaR:d.retail_vc||0, dias:d };
       } else {
         var venta=0, unid=0, mermaU=0, mermaR=0;
         var r = { ctd_sab:0, ctd_dom:0, ctd_lun:0, ctd_mar:0, ctd_mie:0, ctd_jue:0, ctd_vie:0,
@@ -1049,7 +1049,7 @@ function renderTienda(){
         sems.forEach(function(s){
           var dr = (DATA.raw_prod_semana && DATA.raw_prod_semana[tSel] && DATA.raw_prod_semana[tSel][String(s)] && DATA.raw_prod_semana[tSel][String(s)][p]) || {};
           venta  += dr.venta_cfbc||0;
-          unid   += dr.embarque_u||0;
+          unid   += dr.ventas_u||0;
           mermaU += dr.merma_u||0;
           mermaR += dr.retail_vc||0;
           r.ctd_sab += dr.ctd_sab||0; r.ctd_dom += dr.ctd_dom||0; r.ctd_lun += dr.ctd_lun||0;
@@ -1112,14 +1112,14 @@ function renderTienda(){
         if(isAll){
           d = (DATA.totales_prod_tienda && DATA.totales_prod_tienda[t] && DATA.totales_prod_tienda[t][p]) || {};
           ventaSum  += d.venta_cfbc || 0;
-          unidSum   += d.embarque_u || 0;
+          unidSum   += d.ventas_u || 0;
           mermaUSum += d.merma_u    || 0;
           mermaRSum += d.retail_vc  || 0;
         } else {
           sems.forEach(function(s){
             var dr = (DATA.raw_prod_semana && DATA.raw_prod_semana[t] && DATA.raw_prod_semana[t][String(s)] && DATA.raw_prod_semana[t][String(s)][p]) || {};
             ventaSum  += dr.venta_cfbc || 0;
-            unidSum   += dr.embarque_u || 0;
+            unidSum   += dr.ventas_u || 0;
             mermaUSum += dr.merma_u    || 0;
             mermaRSum += dr.retail_vc  || 0;
           });
