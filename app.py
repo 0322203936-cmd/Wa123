@@ -472,6 +472,7 @@ html,body{height:auto;overflow-y:auto}
 .ld-fill{height:100%;background:#0071ce;animation:ld .9s ease-in-out infinite}
 @keyframes ld{0%{transform:translateX(-100%)}100%{transform:translateX(200%)}}
 /* Estilos para vista GASTO */
+#viewGasto{overflow:visible!important;height:auto!important}
 #viewGasto table.t{font-size:.62rem}
 #viewGasto table.t th{font-size:.60rem;padding:2px 4px;white-space:nowrap}
 #viewGasto table.t td{padding:1px 4px;font-size:.62rem}
@@ -855,6 +856,22 @@ function onSemChk(){
       if(row) row.className = 'sem-item';
     }
   });
+  
+  // LÍMITE DE 2 SEMANAS SOLO EN VISTA GASTO
+  if(state.view === 'gasto' && selected.length > 2){
+    // Mantener solo las últimas 2 seleccionadas
+    var keep = selected.slice(-2);
+    chks.forEach(function(c){
+      var s = parseInt(c.value);
+      if(keep.indexOf(s) === -1){
+        c.checked = false;
+        var row = document.getElementById('sem-row-'+s);
+        if(row) row.className = 'sem-item';
+      }
+    });
+    selected = keep;
+  }
+  
   // Si están TODAS seleccionadas → tratar como Global (semanas_sel vacío)
   var esGlobal = (selected.length === DATA.semanas.length);
   state.semanas_sel = esGlobal ? [] : selected;
