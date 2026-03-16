@@ -2,6 +2,7 @@
 Walmex Dashboard — CFBC (con vista GASTO)
 Reporte ejecutivo estilo WalmartMX + vista de gastos por ruta
 """
+
 import hashlib
 import json
 import base64
