@@ -2,6 +2,7 @@
 Walmex Dashboard — CFBC
 Reporte ejecutivo estilo WalmartMX
 """
+
 import hashlib
 import json
 import base64
