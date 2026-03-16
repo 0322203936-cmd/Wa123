@@ -2,7 +2,6 @@
 Walmex Dashboard — CFBC (con vista GASTO)
 Reporte ejecutivo estilo WalmartMX + vista de gastos por ruta
 """
-
 import hashlib
 import json
 import base64
@@ -59,9 +58,9 @@ def cargar_datos(url: str = "") -> dict:
     # Caché en disco: si el Excel no cambió, cargar al instante
     _CACHE_DIR.mkdir(parents=True, exist_ok=True)
     data_cache_file = _CACHE_DIR / f"data_{cache_key}.pkl"
-    # if data_cache_file.exists():
-    #     with open(data_cache_file, "rb") as f:
-    #         return pickle.load(f)
+    if data_cache_file.exists():
+        with open(data_cache_file, "rb") as f:
+            return pickle.load(f)
     wb = openpyxl.load_workbook(excel_path, data_only=True)
     ws = wb['Data']
 
@@ -342,24 +341,24 @@ def cargar_datos(url: str = "") -> dict:
             # Agrupar unidades EMBARCADAS por ruta/semana/producto
             gasto_data[ruta][r['semana']][r['producto']] += r['embarque_u']
     
-    # with open(data_cache_file, "wb") as f:
-    #     pickle.dump({
-    #         'semanas': semanas, 'tiendas': tiendas, 'productos': productos,
-    #         'data': result, 'fecha_por_semana': fecha_por_semana,
-    #         'totales_tienda': dict(totales_tienda),
-    #         'raw_semana': {k: dict(v) for k,v in raw_semana.items()},
-    #         'totales_prod_tienda': {k: {t: dict(p) for t,p in v.items()} for k,v in totales_prod_tienda.items()},
-    #         'producto_gasto': PRODUCTO_GASTO,
-    #         'tienda_ruta': TIENDA_RUTA,
-    #         'gasto_data': {k: {s: dict(p) for s,p in v.items()} for k,v in gasto_data.items()}
-    #     }, f, protocol=pickle.HIGHEST_PROTOCOL)
+    with open(data_cache_file, "wb") as f:
+        pickle.dump({
+            'semanas': semanas, 'tiendas': tiendas, 'productos': productos,
+            'data': result, 'fecha_por_semana': fecha_por_semana,
+            'totales_tienda': dict(totales_tienda),
+            'raw_semana': {k: dict(v) for k,v in raw_semana.items()},
+            'totales_prod_tienda': {k: {t: {p: dict(m) for p,m in prods.items()} for t,prods in tiendas_dict.items()} for k,tiendas_dict in totales_prod_tienda.items()},
+            'producto_gasto': PRODUCTO_GASTO,
+            'tienda_ruta': TIENDA_RUTA,
+            'gasto_data': {k: {s: dict(p) for s,p in v.items()} for k,v in gasto_data.items()}
+        }, f, protocol=pickle.HIGHEST_PROTOCOL)
     
     return {
         'semanas': semanas, 'tiendas': tiendas, 'productos': productos,
         'data': result, 'fecha_por_semana': fecha_por_semana,
         'totales_tienda': dict(totales_tienda),
         'raw_semana': {k: dict(v) for k,v in raw_semana.items()},
-        'totales_prod_tienda': {k: {t: dict(p) for t,p in v.items()} for k,v in totales_prod_tienda.items()},
+        'totales_prod_tienda': {k: {t: {p: dict(m) for p,m in prods.items()} for t,prods in tiendas_dict.items()} for k,tiendas_dict in totales_prod_tienda.items()},
         'producto_gasto': PRODUCTO_GASTO,
         'tienda_ruta': TIENDA_RUTA,
         'gasto_data': {k: {s: dict(p) for s,p in v.items()} for k,v in gasto_data.items()}
