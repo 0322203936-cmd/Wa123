@@ -472,13 +472,13 @@ html,body{height:auto;overflow-y:auto}
 .ld-fill{height:100%;background:#0071ce;animation:ld .9s ease-in-out infinite}
 @keyframes ld{0%{transform:translateX(-100%)}100%{transform:translateX(200%)}}
 /* Estilos para vista GASTO */
-#viewGasto table.t{font-size:.70rem}
-#viewGasto table.t th{font-size:.65rem;padding:3px 8px;white-space:nowrap}
-#viewGasto table.t td{padding:2px 8px}
-#viewGasto .ruta-row td{background:#e8f4fd;font-weight:700;border-top:2px solid #0071ce;border-bottom:1px solid #bbb}
-#viewGasto .unidad-row td{font-size:.68rem}
-#viewGasto .unidad-row td:first-child{padding-left:24px;color:#555}
-#viewGasto .grand-total td{background:#0071ce;color:white;font-weight:700;border-top:3px solid #004a8a}
+#viewGasto table.t{font-size:.62rem}
+#viewGasto table.t th{font-size:.60rem;padding:2px 4px;white-space:nowrap}
+#viewGasto table.t td{padding:1px 4px;font-size:.62rem}
+#viewGasto .ruta-row td{background:#e8f4fd;font-weight:700;border-top:2px solid #0071ce;border-bottom:1px solid #bbb;font-size:.64rem}
+#viewGasto .unidad-row td{font-size:.60rem}
+#viewGasto .unidad-row td:first-child{padding-left:16px;color:#555}
+#viewGasto .grand-total td{background:#0071ce;color:white;font-weight:700;border-top:3px solid #004a8a;font-size:.64rem}
 </style>
 </head>
 <body>
@@ -609,13 +609,23 @@ html,body{height:auto;overflow-y:auto}
 
   <!-- Vista GASTO -->
   <div id="viewGasto" style="display:none; padding:12px 20px;">
-    <div class="box">
-      <div class="box-hdr">Presupuesto por Ruta</div>
-      <div style="overflow-x:auto">
-        <table class="t" id="tGasto">
-          <thead id="tGastoHead"></thead>
-          <tbody id="tGastoBody"></tbody>
-        </table>
+    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
+      <div class="box">
+        <div class="box-hdr">Presupuesto por Ruta</div>
+        <div style="overflow-x:auto">
+          <table class="t" id="tGasto">
+            <thead id="tGastoHead"></thead>
+            <tbody id="tGastoBody"></tbody>
+          </table>
+        </div>
+      </div>
+      
+      <!-- Espacio para la segunda tabla -->
+      <div class="box">
+        <div class="box-hdr">Próxima tabla aquí</div>
+        <div style="padding:20px; text-align:center; color:#999;">
+          Espacio reservado para la siguiente tabla
+        </div>
       </div>
     </div>
   </div>
