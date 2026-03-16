@@ -270,7 +270,7 @@ def cargar_datos(url: str = "") -> dict:
     # Totales crudos por tienda+semana — para filtrar por semana específica
     raw_semana = defaultdict(lambda: defaultdict(lambda: defaultdict(float)))
     # Totales crudos por tienda+semana+producto — para cuadrar tablas inferiores con superiores
-    totales_prod_tienda = defaultdict(lambda: defaultdict(lambda: defaultdict(float)))
+    totales_prod_tienda = defaultdict(lambda: defaultdict(lambda: defaultdict(lambda: defaultdict(float))))
     for r in records:
         totales_tienda[r['tienda']]['embarque_u'] += r['embarque_u']
         totales_tienda[r['tienda']]['venta_cfbc'] += r['venta_cfbc']
