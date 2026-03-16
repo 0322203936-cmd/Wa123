@@ -1,7 +1,6 @@
 """
 Walmex Dashboard — CFBC
 Reporte ejecutivo estilo WalmartMX
-
 """
 import hashlib
 import json
@@ -472,10 +471,13 @@ html,body{height:auto;overflow-y:auto}
 .ld-bar{width:160px;height:3px;background:#dde;border-radius:2px;overflow:hidden}
 .ld-fill{height:100%;background:#0071ce;animation:ld .9s ease-in-out infinite}
 @keyframes ld{0%{transform:translateX(-100%)}100%{transform:translateX(200%)}}
-/* Estilos para vista GASTO */
-#viewGasto{overflow:visible!important;height:auto!important}
-#viewGasto .box{overflow:visible!important;height:auto!important}
+/* Estilos para vista GASTO - FORZAR TODO VISIBLE */
+#viewGasto{overflow:visible!important;height:auto!important;max-height:none!important}
+#viewGasto>div{overflow:visible!important;height:auto!important;max-height:none!important}
+#viewGasto .box{overflow:visible!important;height:auto!important;max-height:none!important}
+#viewGasto .box-hdr{overflow:visible!important}
 #viewGasto .box>div{overflow:visible!important;height:auto!important;max-height:none!important}
+#viewGasto table{overflow:visible!important}
 #viewGasto table.t{font-size:.62rem}
 #viewGasto table.t th{font-size:.60rem;padding:2px 4px;white-space:nowrap}
 #viewGasto table.t td{padding:1px 4px;font-size:.62rem}
@@ -612,11 +614,11 @@ html,body{height:auto;overflow-y:auto}
   </div>
 
   <!-- Vista GASTO -->
-  <div id="viewGasto" style="display:none; padding:12px 20px;">
-    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
-      <div class="box">
+  <div id="viewGasto" style="display:none; padding:12px 20px; overflow:visible !important; height:auto !important;">
+    <div id="gastoGrid" style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; overflow:visible !important; height:auto !important;">
+      <div class="box" style="overflow:visible !important; height:auto !important;">
         <div class="box-hdr">Presupuesto por Ruta</div>
-        <div>
+        <div style="overflow:visible !important; height:auto !important;">
           <table class="t" id="tGasto">
             <thead id="tGastoHead"></thead>
             <tbody id="tGastoBody"></tbody>
@@ -625,9 +627,9 @@ html,body{height:auto;overflow-y:auto}
       </div>
       
       <!-- Espacio para la segunda tabla -->
-      <div class="box">
+      <div class="box" style="overflow:visible !important; height:auto !important;">
         <div class="box-hdr">Próxima tabla aquí</div>
-        <div style="padding:20px; text-align:center; color:#999;">
+        <div style="padding:20px; text-align:center; color:#999; overflow:visible !important; height:auto !important;">
           Espacio reservado para la siguiente tabla
         </div>
       </div>
