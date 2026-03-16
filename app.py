@@ -2,7 +2,6 @@
 Walmex Dashboard — CFBC
 Reporte ejecutivo estilo WalmartMX
 """
-
 import hashlib
 import json
 import base64
@@ -339,6 +338,50 @@ def cargar_datos(url: str = "") -> dict:
                        for t in tiendas if totales_prod_tienda[t][p].get('inventario', 0) > 0}
         }
 
+    # ==== MAPEOS PARA VISTA GASTO ====
+    PRODUCTO_GASTO = {
+        'BQT ALSTROEMERI 8T': 15.00,
+        'BQT GIRASOL 6T': 10.00,
+        'BQT LILI ASIATIC 6T': 15.00,
+        'BQT MINI CLAVEL 8T': 15.00,
+        'BQT MIXTO 12T': 23.00,
+        'BQT MIXTO 15T': 23.00,
+        'BQT MIXTO 18 T': 10.00,
+        'BQT MIXTO 9T': 15.00,
+        'BQT ROSAS 12T': 20.00,
+        'BQT ROSAS 12T BAJA': 20.00,
+        'BQT ROSAS 6T': 15.00,
+        'BQT SNAPDRAGON 8T': 10.00,
+        'BQT ROSAS 6T BAJA': 10.00
+    }
+    
+    TIENDA_RUTA = {
+        'SC LOMAS DE SANTA FE': 'Rutas Playas',
+        'SC ENSENADA CENTRO': 'ENS',
+        'SC ENSENADA': 'ENS',
+        'SC ROSARITO': 'Rutas Playas',
+        'SC PLAYAS DE TIJUANA': 'Rutas Playas',
+        'SC MACROPLAZA INSURGENTES': 'Ruta 2000',
+        'SC DIAZ ORDAZ': 'Ruta 2000',
+        'SC TIJUANA HIPODROMO': 'Ruta 2000',
+        'SC PACIFICO': 'Rutas Playas',
+        'SC TIJUANA 2000': 'Ruta 2000',
+        'SC MEXICALI NOVENA': 'MXL 2',
+        'SC PLAZA SAN PEDRO': 'MXL 2',
+        'SC GALERIAS DEL VALLE': 'MXL 1',
+        'SC MEXICALI': 'MXL 1',
+        'SC TECATE GARITA': 'MXL 1',
+        'SC NUEVO MEXICALI': 'MXL 2'
+    }
+
+    # Procesar datos para vista GASTO: agrupar por ruta/semana/producto
+    gasto_data = defaultdict(lambda: defaultdict(lambda: defaultdict(float)))
+    for r in records:
+        ruta = TIENDA_RUTA.get(r['tienda'])
+        gasto = PRODUCTO_GASTO.get(r['producto'], 0)
+        if ruta and gasto > 0:
+            gasto_data[ruta][r['semana']][r['producto']] += r['embarque_u']
+
     result_dict = {
         'semanas':           semanas,
         'tiendas':           tiendas,
@@ -351,6 +394,9 @@ def cargar_datos(url: str = "") -> dict:
         'totales_prod_tienda': {t: {p: dict(v) for p, v in pd.items()} for t, pd in totales_prod_tienda.items()},
         'inventario_por_tienda': inventario_por_tienda,
         'inventario_por_producto': inventario_por_producto,
+        'producto_gasto': PRODUCTO_GASTO,
+        'tienda_ruta': TIENDA_RUTA,
+        'gasto_data': {k: {s: dict(p) for s,p in v.items()} for k,v in gasto_data.items()}
     }
     try:
         with open(data_cache_file, "wb") as f:
@@ -425,6 +471,14 @@ html,body{height:auto;overflow-y:auto}
 .ld-bar{width:160px;height:3px;background:#dde;border-radius:2px;overflow:hidden}
 .ld-fill{height:100%;background:#0071ce;animation:ld .9s ease-in-out infinite}
 @keyframes ld{0%{transform:translateX(-100%)}100%{transform:translateX(200%)}}
+/* Estilos para vista GASTO */
+#viewGasto table.t{font-size:.70rem}
+#viewGasto table.t th{font-size:.65rem;padding:3px 8px;white-space:nowrap}
+#viewGasto table.t td{padding:2px 8px}
+#viewGasto .ruta-row td{background:#e8f4fd;font-weight:700;border-top:2px solid #0071ce;border-bottom:1px solid #bbb}
+#viewGasto .unidad-row td{font-size:.68rem}
+#viewGasto .unidad-row td:first-child{padding-left:24px;color:#555}
+#viewGasto .grand-total td{background:#0071ce;color:white;font-weight:700;border-top:3px solid #004a8a}
 </style>
 </head>
 <body>
@@ -472,6 +526,7 @@ html,body{height:auto;overflow-y:auto}
       <button onclick="setView('producto')" id="btnProd" style="padding:6px 12px; background:#0071ce; color:white; border:none; border-radius:4px; cursor:pointer; font-weight:600;">📊 Proyección</button>
       <button onclick="setView('tienda')" id="btnTiend" style="padding:6px 12px; background:#ccc; color:#333; border:none; border-radius:4px; cursor:pointer; font-weight:600;">🏪 Tienda</button>
       <button onclick="setView('inventario')" id="btnInv" style="padding:6px 12px; background:#ccc; color:#333; border:none; border-radius:4px; cursor:pointer; font-weight:600;">📦 Inventario Actual</button>
+      <button onclick="setView('gasto')" id="btnGasto" style="padding:6px 12px; background:#ccc; color:#333; border:none; border-radius:4px; cursor:pointer; font-weight:600;">💰 GASTO</button>
     </div>
   </div>
 
@@ -549,6 +604,19 @@ html,body{height:auto;overflow-y:auto}
         <thead><tr><th>Producto</th><th>Inventario Total</th></tr></thead>
         <tbody id="tInvProducto"></tbody>
       </table>
+    </div>
+  </div>
+
+  <!-- Vista GASTO -->
+  <div id="viewGasto" style="display:none; padding:12px 20px; overflow-y:auto">
+    <div class="box">
+      <div class="box-hdr">Presupuesto por Ruta</div>
+      <div style="overflow-x:auto">
+        <table class="t" id="tGasto">
+          <thead id="tGastoHead"></thead>
+          <tbody id="tGastoBody"></tbody>
+        </table>
+      </div>
     </div>
   </div>
 </div>
@@ -785,7 +853,10 @@ function onSemChk(){
   updateSemLabel();
   updateHeader();
   syncChkTodas();
-  if(state.view==='producto') render(); else renderTienda();
+  if(state.view==='producto') render();
+  else if(state.view==='tienda') renderTienda();
+  else if(state.view==='inventario') renderInventario();
+  else if(state.view==='gasto') renderGasto();
 }
 
 function onSem(sel){ onSemChk(); }
@@ -935,14 +1006,17 @@ function setView(v){
   document.getElementById('btnTiend').style.color = v==='tienda' ? 'white' : '#333';
   document.getElementById('btnInv').style.background = v==='inventario' ? '#0071ce' : '#ccc';
   document.getElementById('btnInv').style.color = v==='inventario' ? 'white' : '#333';
+  document.getElementById('btnGasto').style.background = v==='gasto' ? '#0071ce' : '#ccc';
+  document.getElementById('btnGasto').style.color = v==='gasto' ? 'white' : '#333';
   document.getElementById('viewProducto').style.display = v==='producto' ? 'grid' : 'none';
   document.getElementById('viewTienda').style.display = v==='tienda' ? 'grid' : 'none';
   document.getElementById('viewInventario').style.display = v==='inventario' ? 'grid' : 'none';
+  document.getElementById('viewGasto').style.display = v==='gasto' ? 'block' : 'none';
   
-  // Ocultar filtros de tienda en vista Tienda e Inventario
+  // Ocultar filtros de tienda en vista Tienda, Inventario y Gasto
   var tiendaDropWrap = document.getElementById('tiendaDropWrap');
   var tiendaLabel = Array.from(document.querySelectorAll('.ctrl label')).find(el => el.textContent === 'Tienda:');
-  if(v==='tienda' || v==='inventario'){
+  if(v==='tienda' || v==='inventario' || v==='gasto'){
     if(tiendaDropWrap) tiendaDropWrap.style.display = 'none';
     if(tiendaLabel) tiendaLabel.style.display = 'none';
   } else {
@@ -952,6 +1026,7 @@ function setView(v){
   
   if(v==='tienda'){ state.tiendaT = null; renderTienda(); }
   else if(v==='inventario'){ state.invMode = null; state.invSelected = null; renderInventario(); }
+  else if(v==='gasto'){ renderGasto(); }
   else render();
 }
 
@@ -1235,6 +1310,92 @@ function renderInventario(){
   
   document.getElementById('invProductoTitle').innerHTML = title;
   document.getElementById('tInvProducto').innerHTML = rowsProducto;
+}
+
+function renderGasto(){
+  var sems = getSemanasActivas();
+  var gData = DATA.gasto_data;
+  var pGasto = DATA.producto_gasto;
+  
+  // Rutas ordenadas
+  var rutas = ['ENS', 'MXL 1', 'MXL 2', 'Ruta 2000', 'Rutas Playas'];
+  
+  // Construir headers de tabla
+  var headHTML = '<tr><th>Ruta / Producto</th>';
+  sems.forEach(function(s){
+    var yr = Math.floor(s/100), wk = s%100;
+    var label = (yr >= 2000) ? yr+'-'+String(wk).padStart(2,'0') : String(s).padStart(2,'0');
+    headHTML += '<th>'+label+'</th>';
+  });
+  headHTML += '<th>Grand Total</th></tr>';
+  document.getElementById('tGastoHead').innerHTML = headHTML;
+  
+  // Construir filas de datos
+  var bodyHTML = '';
+  var grandTotals = {};
+  var grandTotal = 0;
+  
+  sems.forEach(function(s){ grandTotals[s] = 0; });
+  
+  rutas.forEach(function(ruta){
+    var rutaData = gData[ruta] || {};
+    
+    // Recopilar todos los productos que aparecen en esta ruta
+    var productosSet = new Set();
+    sems.forEach(function(s){
+      var semData = rutaData[s] || {};
+      for(var prod in semData){
+        if(semData[prod] > 0) productosSet.add(prod);
+      }
+    });
+    var productos = Array.from(productosSet).sort();
+    
+    if(productos.length === 0) return;
+    
+    // Fila de ruta con GASTO total
+    var rutaTotal = 0;
+    var rutaRow = '<tr class="ruta-row"><td><strong>'+ruta+'</strong></td>';
+    sems.forEach(function(s){
+      var semData = rutaData[s] || {};
+      var gasto = 0;
+      for(var prod in semData){
+        var unidades = semData[prod];
+        var gastoUnit = pGasto[prod] || 0;
+        gasto += unidades * gastoUnit;
+      }
+      rutaTotal += gasto;
+      grandTotals[s] += gasto;
+      rutaRow += '<td><strong>$'+fmt(gasto)+'</strong></td>';
+    });
+    rutaRow += '<td><strong>$'+fmt(rutaTotal)+'</strong></td></tr>';
+    grandTotal += rutaTotal;
+    bodyHTML += rutaRow;
+    
+    // Filas de productos con UNIDADES embarcadas
+    productos.forEach(function(prod){
+      var prodName = prod.replace('BQT ','');
+      var prodRow = '<tr class="unidad-row"><td>&nbsp;&nbsp;'+prodName+'</td>';
+      var prodTotal = 0;
+      sems.forEach(function(s){
+        var semData = rutaData[s] || {};
+        var unidades = semData[prod] || 0;
+        prodTotal += unidades;
+        prodRow += '<td>'+(unidades > 0 ? Math.round(unidades) : '')+'</td>';
+      });
+      prodRow += '<td>'+(prodTotal > 0 ? Math.round(prodTotal) : '')+'</td></tr>';
+      bodyHTML += prodRow;
+    });
+  });
+  
+  // Fila de Grand Total
+  var gtRow = '<tr class="grand-total"><td><strong>Grand Total</strong></td>';
+  sems.forEach(function(s){
+    gtRow += '<td><strong>$'+fmt(grandTotals[s])+'</strong></td>';
+  });
+  gtRow += '<td><strong>$'+fmt(grandTotal)+'</strong></td></tr>';
+  bodyHTML += gtRow;
+  
+  document.getElementById('tGastoBody').innerHTML = bodyHTML;
 }
 
 function selInvTienda(t){
