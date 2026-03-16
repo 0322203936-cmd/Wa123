@@ -1,7 +1,6 @@
 """
 Walmex Dashboard — CFBC
 Reporte ejecutivo estilo WalmartMX
-
 """
 import hashlib
 import json
@@ -609,7 +608,7 @@ html,body{height:auto;overflow-y:auto}
   </div>
 
   <!-- Vista GASTO -->
-  <div id="viewGasto" style="display:none; padding:12px 20px; overflow-y:auto">
+  <div id="viewGasto" style="display:none; padding:12px 20px;">
     <div class="box">
       <div class="box-hdr">Presupuesto por Ruta</div>
       <div style="overflow-x:auto">
