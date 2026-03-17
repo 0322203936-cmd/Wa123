@@ -572,7 +572,7 @@ html,body{height:auto;overflow-y:auto}
     </div>
     <div class="box" id="boxAvgT" style="display:none">
       <div class="box-hdr" id="avgTTitle">Venta Promedio Semanal</div>
-      <table class="t"><thead><tr><th>Producto</th><th>Venta</th><th>Unidades</th></tr></thead>
+      <table class="t"><thead><tr><th>Producto</th><th>Venta CFBC</th><th>Venta WMX</th><th>Unidades</th></tr></thead>
       <tbody id="tAvgT"></tbody></table>
     </div>
     <div class="box" id="boxProjT" style="display:none">
@@ -1141,7 +1141,7 @@ function renderTienda(){
     document.getElementById('avgTTitle').textContent  = 'Venta — '+tName;
     document.getElementById('projTTitle').textContent = 'Merma — '+tName;
 
-    var totVenta=0, totUnid=0, totMermaU=0, totMermaR=0;
+    var totVenta=0, totWmx=0, totUnid=0, totMermaU=0, totMermaR=0;
     var tDias = {cs:0,cd:0,cl:0,cma:0,cmi:0,cj:0,cv:0,
                  vs:0,vd:0,vl:0,vma:0,vmi:0,vj:0,vv:0};
 
@@ -1149,14 +1149,15 @@ function renderTienda(){
     var prodItems = prods.map(function(p){
       if(isAll){
         var d = (DATA.totales_prod_tienda && DATA.totales_prod_tienda[tSel] && DATA.totales_prod_tienda[tSel][p]) || {};
-        return { p:p, venta:d.venta_cfbc||0, unid:d.ventas_u||0, mermaU:d.merma_u||0, mermaR:d.retail_vc||0, dias:d };
+        return { p:p, venta:d.venta_cfbc||0, wmx:d.venta_wmx||0, unid:d.ventas_u||0, mermaU:d.merma_u||0, mermaR:d.retail_vc||0, dias:d };
       } else {
-        var venta=0, unid=0, mermaU=0, mermaR=0;
+        var venta=0, wmx=0, unid=0, mermaU=0, mermaR=0;
         var r = { ctd_sab:0, ctd_dom:0, ctd_lun:0, ctd_mar:0, ctd_mie:0, ctd_jue:0, ctd_vie:0,
                   vtas_sab:0, vtas_dom:0, vtas_lun:0, vtas_mar:0, vtas_mie:0, vtas_jue:0, vtas_vie:0 };
         sems.forEach(function(s){
           var dr = (DATA.raw_prod_semana && DATA.raw_prod_semana[tSel] && DATA.raw_prod_semana[tSel][String(s)] && DATA.raw_prod_semana[tSel][String(s)][p]) || {};
           venta  += dr.venta_cfbc||0;
+          wmx    += dr.venta_wmx||0;
           unid   += dr.ventas_u||0;
           mermaU += dr.merma_u||0;
           mermaR += dr.retail_vc||0;
@@ -1165,14 +1166,14 @@ function renderTienda(){
           r.vtas_sab += dr.vtas_sab||0; r.vtas_dom += dr.vtas_dom||0; r.vtas_lun += dr.vtas_lun||0;
           r.vtas_mar += dr.vtas_mar||0; r.vtas_mie += dr.vtas_mie||0; r.vtas_jue += dr.vtas_jue||0; r.vtas_vie += dr.vtas_vie||0;
         });
-        return { p:p, venta:venta, unid:unid, mermaU:mermaU, mermaR:mermaR, dias:r };
+        return { p:p, venta:venta, wmx:wmx, unid:unid, mermaU:mermaU, mermaR:mermaR, dias:r };
       }
     });
-    prodItems.forEach(function(o){ totVenta+=o.venta; totUnid+=o.unid; totMermaU+=o.mermaU; totMermaR+=o.mermaR; });
+    prodItems.forEach(function(o){ totVenta+=o.venta; totWmx+=(o.wmx||0); totUnid+=o.unid; totMermaU+=o.mermaU; totMermaR+=o.mermaR; });
     // Venta: ordenar por venta desc
     prodItems.slice().sort(function(a,b){ return b.venta-a.venta; }).forEach(function(o){
       var pname = o.p.replace('BQT ','');
-      avgRows += '<tr><td>'+pname+'</td><td>$'+fmt(o.venta)+'</td><td>'+fmt(o.unid)+'</td></tr>';
+      avgRows += '<tr><td>'+pname+'</td><td>$'+fmt(o.venta)+'</td><td>$'+fmt(o.wmx||0)+'</td><td>'+fmt(o.unid)+'</td></tr>';
     });
     // Merma: ordenar por mermaR desc
     prodItems.slice().sort(function(a,b){ return b.mermaR-a.mermaR; }).forEach(function(o){
@@ -1200,7 +1201,7 @@ function renderTienda(){
         q(d.vtas_sab||0, '$')+q(d.vtas_dom||0, '$')+q(d.vtas_lun||0, '$')+q(d.vtas_mar||0, '$')+q(d.vtas_mie||0, '$')+q(d.vtas_jue||0, '$')+q(d.vtas_vie||0, '$')+'</tr>';
     });
 
-    avgRows  += '<tr class="total"><td>Total</td><td>$'+fmt(totVenta)+'</td><td>'+fmt(totUnid)+'</td></tr>';
+    avgRows  += '<tr class="total"><td>Total</td><td>$'+fmt(totVenta)+'</td><td>$'+fmt(totWmx)+'</td><td>'+fmt(totUnid)+'</td></tr>';
     projRows += '<tr class="total"><td>Total</td><td class="red">'+fmt(totMermaU)+'</td><td class="red">$'+fmt(totMermaR)+'</td></tr>';
     var qT = function(v, pref){ return '<td class="'+(v>0?'red':'')+'">'+(pref||'')+fmt(v)+'</td>'; };
     diasRows += '<tr class="total"><td>Total</td>' +
@@ -1211,15 +1212,16 @@ function renderTienda(){
     document.getElementById('avgTTitle').textContent  = 'Venta Promedio Semanal';
     document.getElementById('projTTitle').textContent = 'Comparacion Ultimas 3 Semanas';
 
-    var totVenta=0, totUnid=0, totMermaU=0, totMermaR=0;
+    var totVenta=0, totWmx=0, totUnid=0, totMermaU=0, totMermaR=0;
     // Construir array sumando todas las tiendas
     var prodItems = prods.map(function(p){
-      var ventaSum=0, unidSum=0, mermaUSum=0, mermaRSum=0;
+      var ventaSum=0, wmxSum=0, unidSum=0, mermaUSum=0, mermaRSum=0;
       tiendas.forEach(function(t){
         var d;
         if(isAll){
           d = (DATA.totales_prod_tienda && DATA.totales_prod_tienda[t] && DATA.totales_prod_tienda[t][p]) || {};
           ventaSum  += d.venta_cfbc || 0;
+          wmxSum    += d.venta_wmx  || 0;
           unidSum   += d.ventas_u || 0;
           mermaUSum += d.merma_u    || 0;
           mermaRSum += d.retail_vc  || 0;
@@ -1227,20 +1229,21 @@ function renderTienda(){
           sems.forEach(function(s){
             var dr = (DATA.raw_prod_semana && DATA.raw_prod_semana[t] && DATA.raw_prod_semana[t][String(s)] && DATA.raw_prod_semana[t][String(s)][p]) || {};
             ventaSum  += dr.venta_cfbc || 0;
+            wmxSum    += dr.venta_wmx  || 0;
             unidSum   += dr.ventas_u || 0;
             mermaUSum += dr.merma_u    || 0;
             mermaRSum += dr.retail_vc  || 0;
           });
         }
       });
-      return { p:p, venta:ventaSum, unid:unidSum, mermaU:mermaUSum, mermaR:mermaRSum };
+      return { p:p, venta:ventaSum, wmx:wmxSum, unid:unidSum, mermaU:mermaUSum, mermaR:mermaRSum };
     }).filter(function(o){ return o.venta||o.unid||o.mermaU||o.mermaR; });
 
-    prodItems.forEach(function(o){ totVenta+=o.venta; totUnid+=o.unid; totMermaU+=o.mermaU; totMermaR+=o.mermaR; });
+    prodItems.forEach(function(o){ totVenta+=o.venta; totWmx+=(o.wmx||0); totUnid+=o.unid; totMermaU+=o.mermaU; totMermaR+=o.mermaR; });
     // Venta: ordenar por venta desc
     prodItems.slice().sort(function(a,b){ return b.venta-a.venta; }).forEach(function(o){
       var pname = o.p.replace('BQT ','');
-      avgRows += '<tr><td>'+pname+'</td><td>$'+fmt(o.venta)+'</td><td>'+fmt(o.unid)+'</td></tr>';
+      avgRows += '<tr><td>'+pname+'</td><td>$'+fmt(o.venta)+'</td><td>$'+fmt(o.wmx||0)+'</td><td>'+fmt(o.unid)+'</td></tr>';
     });
     // Merma: ordenar por mermaR desc
     prodItems.slice().sort(function(a,b){ return b.mermaR-a.mermaR; }).forEach(function(o){
@@ -1249,7 +1252,7 @@ function renderTienda(){
         +'<td class="'+(o.mermaU>0?'red':'')+'">'+fmt(o.mermaU)+'</td>'
         +'<td class="'+(o.mermaR>0?'red':'')+'">$'+fmt(o.mermaR)+'</td></tr>';
     });
-    avgRows  += '<tr class="total"><td>Total</td><td>$'+fmt(totVenta)+'</td><td>'+fmt(totUnid)+'</td></tr>';
+    avgRows  += '<tr class="total"><td>Total</td><td>$'+fmt(totVenta)+'</td><td>$'+fmt(totWmx)+'</td><td>'+fmt(totUnid)+'</td></tr>';
     projRows += '<tr class="total"><td>Total</td><td class="red">'+fmt(totMermaU)+'</td><td class="red">$'+fmt(totMermaR)+'</td></tr>';
   }
 
