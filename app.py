@@ -47,7 +47,7 @@ st.set_page_config(page_title="Walmex · CFBC", layout="wide", initial_sidebar_s
 st.markdown("""
 <style>
 .main .block-container { padding: 0 !important; max-width: 100% !important; margin: 0 !important; }
-.main { padding: 0 !important; overflow: hidden !important; }
+.main { padding: 0 !important; overflow: auto !important; }
 .stApp { margin: 0 !important; }
 [data-testid="stHeader"],[data-testid="stSidebar"],[data-testid="stToolbar"],
 [data-testid="stDecoration"],[data-testid="stStatusWidget"],
@@ -64,139 +64,179 @@ iframe[src*="badge"] {
 [data-testid='stVerticalBlock'] { gap: 0 !important; padding: 0 !important; }
 div[data-testid='stHtml'] { padding: 0 !important; margin: 0 !important; line-height: 0 !important; }
 iframe { display: block !important; margin: 0 !important; border: none !important; }
+
+/* ── Barra tuerca ── */
+.gear-bar {
+    display: flex; justify-content: flex-end; align-items: center;
+    background: #0071CE; height: 28px; padding: 0 8px;
+    position: relative; z-index: 100;
+}
+/* reduce el padding de todas las columnas dentro de gear-bar */
+.gear-bar-wrap div[data-testid="stHorizontalBlock"] {
+    gap: 0 !important; background: #0071CE; padding: 0 !important;
+    align-items: center !important; min-height: 28px !important;
+}
+.gear-bar-wrap div[data-testid="column"] {
+    padding: 0 !important; min-height: 0 !important;
+}
+/* Botón tuerca pequeño */
+.gear-bar-wrap button[kind="secondary"] {
+    background: transparent !important; border: none !important;
+    color: white !important; font-size: 16px !important;
+    padding: 2px 6px !important; min-height: 0 !important;
+    height: 24px !important; line-height: 1 !important;
+    cursor: pointer;
+}
+.gear-bar-wrap button[kind="secondary"]:hover { background: rgba(255,255,255,0.15) !important; border-radius: 4px !important; }
+/* Panel de config: ligero borde inferior */
+.cfg-panel { background: #f8f9fa; border-bottom: 2px solid #0071CE; padding: 12px 16px 8px; }
 </style>
 """, unsafe_allow_html=True)
 
 # ──────────────────────────────────────────────
-# CONFIGURACIÓN DE COLUMNAS
+# CONFIGURACIÓN DE COLUMNAS — persistente para todos los usuarios
 # ──────────────────────────────────────────────
+_MAPPING_FILE = _CACHE_DIR / "col_mapping.json"
+
 _FIELDS = [
-    # (key, etiqueta, nombre_por_defecto, requerido)
-    ('producto',   '📦 Producto / Descripción',      'Desc Art 1',                         True),
-    ('tienda',     '🏪 Tienda / Club',               'Nombre Tienda/Club',                 True),
-    ('semana',     '📅 Número de Semana',             'SEM',                                True),
-    ('fecha',      '🗓️ Fecha (Diario)',               'Diario',                             True),
-    ('ventas',     '🛒 Ventas Unidades (Cnt POS)',    'Cnt POS',                            True),
-    ('embarque',   '🚚 Embarque Unidades',            'Cntd Embarque',                      True),
-    ('merma_vc',   '🗑️ Merma (Cant VC Tienda)',       'Cant VC Tienda',                     True),
-    ('venta_cfbc', '💰 Venta CFBC / Costo',           'Venta CFBC / Costo (Facturado)',     False),
-    ('venta_wmx',  '💵 Venta WMX / Precio Costo',     'Venta WMX / Precio Costo (Vendido)', False),
-    ('retail_vc',  '🏷️ Retail VC Tienda',             'Suma de Retail VC Tienda',           False),
-    ('inventario', '📊 Inventario Actual',             'Cantidad Actual en Existentes de la tienda', False),
+    # (key, etiqueta, requerido)
+    ('producto',   '📦 Producto / Artículo',         True),
+    ('tienda',     '🏪 Tienda / Club',               True),
+    ('semana',     '📅 Número de Semana',             True),
+    ('fecha',      '🗓️ Fecha diaria',                True),
+    ('ventas',     '🛒 Ventas Unidades',              True),
+    ('embarque',   '🚚 Embarque Unidades',            True),
+    ('merma_vc',   '🗑️ Merma / Cant VC',             True),
+    ('venta_cfbc', '💰 Venta CFBC / Costo',           False),
+    ('venta_wmx',  '💵 Venta WMX / Precio Costo',     False),
+    ('retail_vc',  '🏷️ Retail VC Tienda',             False),
+    ('inventario', '📊 Inventario Actual',             False),
 ]
 _DIAS = ['Dom', 'Lun', 'Mar', 'Mie', 'Jue', 'Vie', 'Sab']
 
 def _default_col_mapping(headers):
-    """Intenta asignar automáticamente columnas buscando nombres alternativos conocidos."""
-    _alternatives = {
+    _alts = {
+        'producto':   ['Desc Art 1'],
+        'tienda':     ['Nombre Tienda/Club'],
+        'semana':     ['SEM'],
+        'fecha':      ['Diario'],
+        'ventas':     ['Cnt POS'],
+        'embarque':   ['Cntd Embarque'],
+        'merma_vc':   ['Cant VC Tienda'],
         'venta_cfbc': ['Venta CFBC / Costo (Facturado)', 'Venta CFBC/Costo (Facturado)', 'Venta CFBC', 'CFBC'],
         'venta_wmx':  ['Venta WMX / Precio Costo (Vendido)', 'Venta WMX/Precio Costo (Vendido)', 'Venta WMX', 'WMX'],
         'retail_vc':  ['Suma de Retail VC Tienda', 'Suma de Retail VC Tienda ', 'Retail VC Tienda', 'Retail VC'],
         'inventario': ['Cantidad Actual en Existentes de la tienda', 'Cantidad Actual en Existentes', 'Inventario Actual', 'Existentes'],
     }
     mapping = {}
-    for key, _, default, _ in _FIELDS:
-        alts = _alternatives.get(key, [default])
-        found = next((h for h in alts if h in headers), None)
-        mapping[key] = found
+    for key, _, _ in _FIELDS:
+        mapping[key] = next((h for h in _alts.get(key, []) if h in headers), None)
     for d in _DIAS:
         dl = d.lower()
         mapping[f'ctd_{dl}']  = next((h for h in [f'Ctd {d}', f'Cnt {d}'] if h in headers), None)
         mapping[f'vtas_{dl}'] = f'Ventas {d}' if f'Ventas {d}' in headers else None
     return mapping
 
-def show_column_config():
-    """Muestra la pantalla de mapeo de columnas y devuelve True cuando el usuario confirma."""
-    headers = get_excel_headers()
-    if not headers:
-        st.error("❌ No se encontró el archivo Excel. Asegúrate de que 'Analisis_Walmart.xlsx' esté en el repositorio.")
-        st.stop()
-
-    options_req  = headers           # sólo encabezados (campos requeridos)
-    options_opt  = ['(no usar)'] + headers
-
-    # Inicializar valores del widget con auto-detección
-    auto = _default_col_mapping(headers)
-    for key, _, _, _ in _FIELDS:
-        sk = f'col_{key}'
-        if sk not in st.session_state:
-            default = auto.get(key)
-            if default and default in options_req:
-                st.session_state[sk] = default
-
-    st.markdown("## ⚙️ Configuración de Columnas del Excel")
-    st.caption("Asigna qué columna de tu archivo Excel corresponde a cada campo. "
-               "Los campos con ✱ son obligatorios.")
-
-    col_a, col_b = st.columns(2)
-    for i, (key, label, _, required) in enumerate(_FIELDS):
-        sk = f'col_{key}'
-        target_col = col_a if i % 2 == 0 else col_b
-        opts = options_req if required else options_opt
-        cur  = st.session_state.get(sk)
+def load_shared_mapping():
+    """Lee el mapping del disco (compartido entre todos). Si no existe, auto-detecta."""
+    _CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    if _MAPPING_FILE.exists():
         try:
-            idx = opts.index(cur) if cur in opts else 0
+            return json.loads(_MAPPING_FILE.read_text(encoding='utf-8'))
+        except Exception:
+            pass
+    headers = get_excel_headers()
+    return _default_col_mapping(headers) if headers else {}
+
+def save_shared_mapping(mapping: dict):
+    """Guarda el mapping en disco para todos los usuarios."""
+    _CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    _MAPPING_FILE.write_text(json.dumps(mapping, ensure_ascii=False, indent=2), encoding='utf-8')
+
+# Cargar mapping al inicio (desde disco)
+if 'col_mapping' not in st.session_state:
+    st.session_state['col_mapping'] = load_shared_mapping()
+if 'show_col_config' not in st.session_state:
+    st.session_state['show_col_config'] = False
+
+# ── Barra superior con tuerca ─────────────────
+st.markdown('<div class="gear-bar-wrap">', unsafe_allow_html=True)
+_g1, _g2 = st.columns([30, 1])
+with _g2:
+    if st.button("⚙️", help="Configurar columnas del Excel", key="_gear_btn"):
+        st.session_state['show_col_config'] = not st.session_state['show_col_config']
+        st.rerun()
+st.markdown('</div>', unsafe_allow_html=True)
+
+# ── Panel de configuración (inline, colapsable) ─
+if st.session_state.get('show_col_config', False):
+    headers = get_excel_headers()
+    options_opt = ['(no usar)'] + (headers or [])
+    options_req = headers or []
+    cur_map = st.session_state['col_mapping']
+
+    st.markdown('<div class="cfg-panel">', unsafe_allow_html=True)
+    st.markdown("##### ⚙️ Columnas del Excel — selecciona cuál corresponde a cada campo")
+
+    # Inicializar widgets con valores actuales guardados
+    for key, _, _ in _FIELDS:
+        if f'_cfg_{key}' not in st.session_state:
+            st.session_state[f'_cfg_{key}'] = cur_map.get(key) or '(no usar)'
+
+    ca, cb, cc = st.columns(3)
+    cols_cycle = [ca, cb, cc]
+    for i, (key, label, required) in enumerate(_FIELDS):
+        opts  = options_req if required else options_opt
+        saved = cur_map.get(key)
+        try:
+            idx = opts.index(saved) if saved and saved in opts else 0
         except ValueError:
             idx = 0
-        target_col.selectbox(
+        cols_cycle[i % 3].selectbox(
             f"{'✱ ' if required else ''}{label}",
-            options=opts,
-            index=idx,
-            key=sk,
+            options=opts, index=idx,
+            key=f'_cfg_{key}',
         )
 
-    with st.expander("📅 Columnas por Día de la Semana (opcionales)", expanded=False):
-        day_cols = st.columns(4)
-        for i, d in enumerate(_DIAS):
+    with st.expander("📅 Días de la semana (opcionales)", expanded=False):
+        dcols = st.columns(7)
+        for di, d in enumerate(_DIAS):
             dl = d.lower()
-            for prefix, lbl in [('ctd', f'Cantidad {d}'), ('vtas', f'Ventas {d}')]:
-                sk2 = f'col_{prefix}_{dl}'
-                if sk2 not in st.session_state:
-                    default2 = auto.get(f'{prefix}_{dl}')
-                    st.session_state[sk2] = default2 if default2 else '(no usar)'
-                day_cols[i % 4].selectbox(
-                    lbl, options=options_opt,
-                    index=options_opt.index(st.session_state[sk2]) if st.session_state[sk2] in options_opt else 0,
-                    key=sk2,
-                )
+            for prefix, lbl in [('ctd', f'Ctd {d}'), ('vtas', f'Vtas {d}')]:
+                sk = f'_cfg_{prefix}_{dl}'
+                saved2 = cur_map.get(f'{prefix}_{dl}')
+                try:
+                    idx2 = options_opt.index(saved2) if saved2 and saved2 in options_opt else 0
+                except ValueError:
+                    idx2 = 0
+                dcols[di].selectbox(lbl, options=options_opt, index=idx2, key=sk)
 
-    st.markdown("---")
-    btn_col, info_col = st.columns([1, 3])
-    if btn_col.button("✅ Guardar y cargar datos", type="primary", use_container_width=True):
-        # Validar campos requeridos
-        missing = [lbl for key, lbl, _, req in _FIELDS
-                   if req and not st.session_state.get(f'col_{key}')]
+    sa_col, cl_col, _ = st.columns([1, 1, 6])
+    if sa_col.button("💾 Guardar para todos", type="primary", key="_cfg_save"):
+        missing = [lbl for key, lbl, req in _FIELDS
+                   if req and (not st.session_state.get(f'_cfg_{key}') or st.session_state[f'_cfg_{key}'] == '(no usar)')]
         if missing:
-            st.error(f"⚠️ Faltan campos requeridos: {', '.join(missing)}")
+            st.error(f"Faltan campos obligatorios: {', '.join(missing)}")
         else:
-            # Construir mapping final
-            final_mapping = {}
-            for key, _, _, _ in _FIELDS:
-                v = st.session_state.get(f'col_{key}')
-                final_mapping[key] = v if v and v != '(no usar)' else None
+            new_map = {}
+            for key, _, _ in _FIELDS:
+                v = st.session_state.get(f'_cfg_{key}')
+                new_map[key] = v if v and v != '(no usar)' else None
             for d in _DIAS:
                 dl = d.lower()
                 for prefix in ('ctd', 'vtas'):
-                    v = st.session_state.get(f'col_{prefix}_{dl}')
-                    final_mapping[f'{prefix}_{dl}'] = v if v and v != '(no usar)' else None
-            st.session_state['col_mapping']    = final_mapping
-            st.session_state['col_configured'] = True
-            # Limpiar caché de datos para que se recarguen con el nuevo mapping
+                    v = st.session_state.get(f'_cfg_{prefix}_{dl}')
+                    new_map[f'{prefix}_{dl}'] = v if v and v != '(no usar)' else None
+            save_shared_mapping(new_map)
+            st.session_state['col_mapping'] = new_map
+            st.session_state['show_col_config'] = False
             cargar_datos.clear()
+            st.success("✅ Guardado. Recargando datos…")
             st.rerun()
-    info_col.info("Los campos opcionales pueden dejarse en '(no usar)' si no existen en tu Excel.")
-
-# Mostrar pantalla de configuración si aún no se ha configurado
-if not st.session_state.get('col_configured', False):
-    show_column_config()
-    st.stop()
-
-# Botón discreto para volver a configurar columnas
-with st.sidebar:
-    if st.button("⚙️ Reconfigurar columnas"):
-        st.session_state['col_configured'] = False
-        cargar_datos.clear()
+    if cl_col.button("✖ Cancelar", key="_cfg_cancel"):
+        st.session_state['show_col_config'] = False
         st.rerun()
+    st.markdown('</div>', unsafe_allow_html=True)
 
 
 @st.cache_data(ttl=3600, show_spinner=False)
