@@ -26,12 +26,28 @@ def _excel_cache_key():
     key = hashlib.md5(f"{p}{mtime}".encode()).hexdigest()[:16]
     return str(p), mtime, key
 
+@st.cache_data(show_spinner=False)
+def get_excel_headers() -> list:
+    """Lee sólo la fila de encabezados del Excel (muy rápido)."""
+    paths = ["Analisis_Walmart.xlsx", "Analisis Walmart.xlsx"]
+    excel_path = next((p for p in paths if Path(p).exists()), None)
+    if not excel_path:
+        return []
+    try:
+        wb = openpyxl.load_workbook(excel_path, data_only=True, read_only=True)
+        ws = wb['Data']
+        headers = [str(c.value).strip() if c.value else '' for c in next(ws.iter_rows(min_row=1, max_row=1))]
+        wb.close()
+        return [h for h in headers if h]
+    except Exception:
+        return []
+
 st.set_page_config(page_title="Walmex · CFBC", layout="wide", initial_sidebar_state="collapsed")
 
 st.markdown("""
 <style>
 .main .block-container { padding: 0 !important; max-width: 100% !important; margin: 0 !important; }
-.main { padding: 0 !important; overflow: hidden !important; }
+.main { padding: 0 !important; overflow: auto !important; }
 .stApp { margin: 0 !important; }
 [data-testid="stHeader"],[data-testid="stSidebar"],[data-testid="stToolbar"],
 [data-testid="stDecoration"],[data-testid="stStatusWidget"],
@@ -48,20 +64,188 @@ iframe[src*="badge"] {
 [data-testid='stVerticalBlock'] { gap: 0 !important; padding: 0 !important; }
 div[data-testid='stHtml'] { padding: 0 !important; margin: 0 !important; line-height: 0 !important; }
 iframe { display: block !important; margin: 0 !important; border: none !important; }
+
+/* ── Barra tuerca ── */
+.gear-bar {
+    display: flex; justify-content: flex-end; align-items: center;
+    background: #0071CE; height: 28px; padding: 0 8px;
+    position: relative; z-index: 100;
+}
+/* reduce el padding de todas las columnas dentro de gear-bar */
+.gear-bar-wrap div[data-testid="stHorizontalBlock"] {
+    gap: 0 !important; background: #0071CE; padding: 0 !important;
+    align-items: center !important; min-height: 28px !important;
+}
+.gear-bar-wrap div[data-testid="column"] {
+    padding: 0 !important; min-height: 0 !important;
+}
+/* Botón tuerca pequeño */
+.gear-bar-wrap button[kind="secondary"] {
+    background: transparent !important; border: none !important;
+    color: white !important; font-size: 16px !important;
+    padding: 2px 6px !important; min-height: 0 !important;
+    height: 24px !important; line-height: 1 !important;
+    cursor: pointer;
+}
+.gear-bar-wrap button[kind="secondary"]:hover { background: rgba(255,255,255,0.15) !important; border-radius: 4px !important; }
+/* Panel de config: ligero borde inferior */
+.cfg-panel { background: #f8f9fa; border-bottom: 2px solid #0071CE; padding: 12px 16px 8px; }
 </style>
 """, unsafe_allow_html=True)
 
+# ──────────────────────────────────────────────
+# CONFIGURACIÓN DE COLUMNAS — persistente para todos los usuarios
+# ──────────────────────────────────────────────
+_MAPPING_FILE = _CACHE_DIR / "col_mapping.json"
+
+_FIELDS = [
+    # (key, etiqueta, requerido)
+    ('producto',   '📦 Producto / Artículo',         True),
+    ('tienda',     '🏪 Tienda / Club',               True),
+    ('semana',     '📅 Número de Semana',             True),
+    ('fecha',      '🗓️ Fecha diaria',                True),
+    ('ventas',     '🛒 Ventas Unidades',              True),
+    ('embarque',   '🚚 Embarque Unidades',            True),
+    ('merma_vc',   '🗑️ Merma / Cant VC',             True),
+    ('venta_cfbc', '💰 Venta CFBC / Costo',           False),
+    ('venta_wmx',  '💵 Venta WMX / Precio Costo',     False),
+    ('retail_vc',  '🏷️ Retail VC Tienda',             False),
+    ('inventario', '📊 Inventario Actual',             False),
+]
+_DIAS = ['Dom', 'Lun', 'Mar', 'Mie', 'Jue', 'Vie', 'Sab']
+
+def _default_col_mapping(headers):
+    _alts = {
+        'producto':   ['Desc Art 1'],
+        'tienda':     ['Nombre Tienda/Club'],
+        'semana':     ['SEM'],
+        'fecha':      ['Diario'],
+        'ventas':     ['Cnt POS'],
+        'embarque':   ['Cntd Embarque'],
+        'merma_vc':   ['Cant VC Tienda'],
+        'venta_cfbc': ['Venta CFBC / Costo (Facturado)', 'Venta CFBC/Costo (Facturado)', 'Venta CFBC', 'CFBC'],
+        'venta_wmx':  ['Venta WMX / Precio Costo (Vendido)', 'Venta WMX/Precio Costo (Vendido)', 'Venta WMX', 'WMX'],
+        'retail_vc':  ['Suma de Retail VC Tienda', 'Suma de Retail VC Tienda ', 'Retail VC Tienda', 'Retail VC'],
+        'inventario': ['Cantidad Actual en Existentes de la tienda', 'Cantidad Actual en Existentes', 'Inventario Actual', 'Existentes'],
+    }
+    mapping = {}
+    for key, _, _ in _FIELDS:
+        mapping[key] = next((h for h in _alts.get(key, []) if h in headers), None)
+    for d in _DIAS:
+        dl = d.lower()
+        mapping[f'ctd_{dl}']  = next((h for h in [f'Ctd {d}', f'Cnt {d}'] if h in headers), None)
+        mapping[f'vtas_{dl}'] = f'Ventas {d}' if f'Ventas {d}' in headers else None
+    return mapping
+
+def load_shared_mapping():
+    """Lee el mapping del disco (compartido entre todos). Si no existe, auto-detecta."""
+    _CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    if _MAPPING_FILE.exists():
+        try:
+            return json.loads(_MAPPING_FILE.read_text(encoding='utf-8'))
+        except Exception:
+            pass
+    headers = get_excel_headers()
+    return _default_col_mapping(headers) if headers else {}
+
+def save_shared_mapping(mapping: dict):
+    """Guarda el mapping en disco para todos los usuarios."""
+    _CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    _MAPPING_FILE.write_text(json.dumps(mapping, ensure_ascii=False, indent=2), encoding='utf-8')
+
+# Cargar mapping al inicio (desde disco)
+if 'col_mapping' not in st.session_state:
+    st.session_state['col_mapping'] = load_shared_mapping()
+if 'show_col_config' not in st.session_state:
+    st.session_state['show_col_config'] = False
+
+# ── Barra superior con tuerca ─────────────────
+st.markdown('<div class="gear-bar-wrap">', unsafe_allow_html=True)
+_g1, _g2 = st.columns([30, 1])
+with _g2:
+    if st.button("⚙️", help="Configurar columnas del Excel", key="_gear_btn"):
+        st.session_state['show_col_config'] = not st.session_state['show_col_config']
+        st.rerun()
+st.markdown('</div>', unsafe_allow_html=True)
+
+# ── Panel de configuración (inline, colapsable) ─
+if st.session_state.get('show_col_config', False):
+    headers = get_excel_headers()
+    options_opt = ['(no usar)'] + (headers or [])
+    options_req = headers or []
+    cur_map = st.session_state['col_mapping']
+
+    st.markdown('<div class="cfg-panel">', unsafe_allow_html=True)
+    st.markdown("##### ⚙️ Columnas del Excel — selecciona cuál corresponde a cada campo")
+
+    # Inicializar widgets con valores actuales guardados
+    for key, _, _ in _FIELDS:
+        if f'_cfg_{key}' not in st.session_state:
+            st.session_state[f'_cfg_{key}'] = cur_map.get(key) or '(no usar)'
+
+    ca, cb, cc = st.columns(3)
+    cols_cycle = [ca, cb, cc]
+    for i, (key, label, required) in enumerate(_FIELDS):
+        opts  = options_req if required else options_opt
+        saved = cur_map.get(key)
+        try:
+            idx = opts.index(saved) if saved and saved in opts else 0
+        except ValueError:
+            idx = 0
+        cols_cycle[i % 3].selectbox(
+            f"{'✱ ' if required else ''}{label}",
+            options=opts, index=idx,
+            key=f'_cfg_{key}',
+        )
+
+    with st.expander("📅 Días de la semana (opcionales)", expanded=False):
+        dcols = st.columns(7)
+        for di, d in enumerate(_DIAS):
+            dl = d.lower()
+            for prefix, lbl in [('ctd', f'Ctd {d}'), ('vtas', f'Vtas {d}')]:
+                sk = f'_cfg_{prefix}_{dl}'
+                saved2 = cur_map.get(f'{prefix}_{dl}')
+                try:
+                    idx2 = options_opt.index(saved2) if saved2 and saved2 in options_opt else 0
+                except ValueError:
+                    idx2 = 0
+                dcols[di].selectbox(lbl, options=options_opt, index=idx2, key=sk)
+
+    sa_col, cl_col, _ = st.columns([1, 1, 6])
+    if sa_col.button("💾 Guardar para todos", type="primary", key="_cfg_save"):
+        missing = [lbl for key, lbl, req in _FIELDS
+                   if req and (not st.session_state.get(f'_cfg_{key}') or st.session_state[f'_cfg_{key}'] == '(no usar)')]
+        if missing:
+            st.error(f"Faltan campos obligatorios: {', '.join(missing)}")
+        else:
+            new_map = {}
+            for key, _, _ in _FIELDS:
+                v = st.session_state.get(f'_cfg_{key}')
+                new_map[key] = v if v and v != '(no usar)' else None
+            for d in _DIAS:
+                dl = d.lower()
+                for prefix in ('ctd', 'vtas'):
+                    v = st.session_state.get(f'_cfg_{prefix}_{dl}')
+                    new_map[f'{prefix}_{dl}'] = v if v and v != '(no usar)' else None
+            save_shared_mapping(new_map)
+            st.session_state['col_mapping'] = new_map
+            st.session_state['show_col_config'] = False
+            cargar_datos.clear()
+            st.success("✅ Guardado. Recargando datos…")
+            st.rerun()
+    if cl_col.button("✖ Cancelar", key="_cfg_cancel"):
+        st.session_state['show_col_config'] = False
+        st.rerun()
+    st.markdown('</div>', unsafe_allow_html=True)
+
+
 @st.cache_data(ttl=3600, show_spinner=False)
-def cargar_datos(url: str = "") -> dict:
+def cargar_datos(col_mapping: dict = None, url: str = "") -> dict:
     excel_path, _, cache_key = _excel_cache_key()
     if not excel_path:
         raise FileNotFoundError("No se encontró Analisis_Walmart.xlsx. Súbelo al repo de GitHub.")
-    # Caché en disco: si el Excel no cambió, cargar al instante
     _CACHE_DIR.mkdir(parents=True, exist_ok=True)
     data_cache_file = _CACHE_DIR / f"data_{cache_key}.pkl"
-    # if data_cache_file.exists():
-    #     with open(data_cache_file, "rb") as f:
-    #         return pickle.load(f)
     wb = openpyxl.load_workbook(excel_path, data_only=True)
     ws = wb['Data']
 
@@ -69,79 +253,43 @@ def cargar_datos(url: str = "") -> dict:
         try: return float(v) if v is not None else 0.0
         except: return 0.0
 
-    # Mapear columnas por nombre de encabezado — fila 1
     headers = [str(c.value).strip() if c.value else '' for c in ws[1]]
     def col(name):
         for i, h in enumerate(headers):
             if h == name: return i
         raise ValueError(f'Columna "{name}" no encontrada. Encabezados: {headers}')
 
-    # Log headers para diagnóstico si alguna columna falla
+    m = col_mapping or {}
+
+    def _col_from_mapping(key, default_name):
+        name = m.get(key) or default_name
+        return col(name)
+
+    def _col_opt(key):
+        name = m.get(key)
+        if not name: return None
+        try: return col(name)
+        except ValueError: return None
+
     import sys
-    _col_names = [h for h in headers if h]
-    
-    idx_producto = col('Desc Art 1')
-    idx_tienda   = col('Nombre Tienda/Club')
-    idx_semana   = col('SEM')
-    idx_fecha    = col('Diario')
-    idx_ventas   = col('Cnt POS')       # Unidades vendidas (Cnt POS)
-    idx_embarque = col('Cntd Embarque') # Unidades embarcadas
-    idx_merma_vc = col('Cant VC Tienda') # Merma (Cant VC Tienda)
-    
-    # Columnas opcionales para Tienda — intentar varios nombres posibles
-    idx_venta_cfbc = None
-    for _n in ['Venta CFBC / Costo (Facturado)', 'Venta CFBC/Costo (Facturado)',
-               'Venta CFBC', 'CFBC']:
-        try: idx_venta_cfbc = col(_n); break
-        except: pass
 
-    idx_venta_wmx = None
-    for _n in ['Venta WMX / Precio Costo (Vendido)', 'Venta WMX/Precio Costo (Vendido)',
-               'Venta WMX', 'WMX']:
-        try: idx_venta_wmx = col(_n); break
-        except: pass
+    idx_producto = _col_from_mapping('producto',  'Desc Art 1')
+    idx_tienda   = _col_from_mapping('tienda',    'Nombre Tienda/Club')
+    idx_semana   = _col_from_mapping('semana',    'SEM')
+    idx_fecha    = _col_from_mapping('fecha',     'Diario')
+    idx_ventas   = _col_from_mapping('ventas',    'Cnt POS')
+    idx_embarque = _col_from_mapping('embarque',  'Cntd Embarque')
+    idx_merma_vc = _col_from_mapping('merma_vc',  'Cant VC Tienda')
 
-    idx_retail_vc = None
-    for _n in ['Suma de Retail VC Tienda', 'Retail VC Tienda',
-               'Suma Retail VC Tienda', 'Retail VC', 'Suma de Retail VC',
-               'Suma de Retail VC Tienda ']:  # trailing space variant
-        try: idx_retail_vc = col(_n); break
-        except: pass
+    idx_venta_cfbc = _col_opt('venta_cfbc')
+    idx_venta_wmx  = _col_opt('venta_wmx')
+    idx_retail_vc  = _col_opt('retail_vc')
+    idx_inventario = _col_opt('inventario')
 
-    # Columna de inventario actual
-    idx_inventario = None
-    for _n in ['Cantidad Actual en Existentes de la tienda', 'Cantidad Actual en Existentes',
-               'Cantidad Actual', 'Inventario Actual', 'Existentes']:
-        try: idx_inventario = col(_n); break
-        except: pass
-
-    # Advertir si columnas clave no se encontraron
-    if idx_retail_vc is None:
-        import streamlit as _st
-        _st.warning(
-            f"⚠️ No se encontró columna 'Retail VC Tienda'. "
-            f"Columnas disponibles: {[h for h in headers if h and 'VC' in h or 'Retail' in h or 'retail' in h.lower() if h]}\n"
-            f"Todos los encabezados: {[h for h in headers if h]}"
-        )
-    
-    if idx_inventario is None:
-        import streamlit as _st
-        _st.warning(
-            f"⚠️ No se encontró columna 'Cantidad Actual en Existentes de la tienda'. "
-            f"Inventario no estará disponible. Columnas disponibles: {[h for h in headers if h]}"
-        )
-
-    # Columnas de días de la semana (opcionales)
     _dias = ['Dom', 'Lun', 'Mar', 'Mie', 'Jue', 'Vie', 'Sab']
-    idx_ctd   = {}
-    idx_vtas  = {}
-    for d in _dias:
-        try: idx_ctd[d] = col(f'Ctd {d}')
-        except: 
-            try: idx_ctd[d] = col(f'Cnt {d}')
-            except: idx_ctd[d] = None
-        try: idx_vtas[d] = col(f'Ventas {d}')
-        except: idx_vtas[d] = None
+    idx_ctd  = {d: _col_opt(f'ctd_{d.lower()}')  for d in _dias}
+    idx_vtas = {d: _col_opt(f'vtas_{d.lower()}') for d in _dias}
+
 
     records = []
     for row in ws.iter_rows(min_row=2, values_only=True):
@@ -407,7 +555,7 @@ def cargar_datos(url: str = "") -> dict:
     return result_dict
 
 try:
-    DATA = cargar_datos()
+    DATA = cargar_datos(col_mapping=st.session_state.get('col_mapping'))
 except Exception as e:
     st.error(f"❌ Error cargando datos: {e}")
     st.stop()
