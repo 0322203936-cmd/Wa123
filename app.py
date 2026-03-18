@@ -1,6 +1,7 @@
 """
 Walmex Dashboard — CFBC
 Reporte ejecutivo estilo WalmartMX
+
 """
 import hashlib
 import json
@@ -14,37 +15,6 @@ import streamlit.components.v1 as components
 
 # Caché en disco: mismo Excel = carga al instante (al abrir, al cambiar código o restablecer)
 _CACHE_DIR = Path(__file__).resolve().parent / ".wa123_cache"
-_CONFIG_FILE = Path(__file__).resolve().parent / "column_config.json"
-
-# ── Leer/guardar configuración de columnas ──────────────────────────────────
-def _load_col_config() -> dict:
-    if _CONFIG_FILE.exists():
-        try:
-            return json.load(open(_CONFIG_FILE, encoding='utf-8'))
-        except Exception:
-            pass
-    return {}
-
-def _save_col_config(cfg: dict):
-    _CONFIG_FILE.write_text(json.dumps(cfg, ensure_ascii=False, indent=2), encoding='utf-8')
-
-def _get_excel_headers() -> list:
-    """Lee solo la fila 1 del Excel para obtener los encabezados disponibles."""
-    paths = ["Analisis_Walmart.xlsx", "Analisis Walmart.xlsx"]
-    excel_path = next((p for p in paths if Path(p).exists()), None)
-    if not excel_path:
-        return []
-    try:
-        wb = openpyxl.load_workbook(excel_path, data_only=True, read_only=True)
-        ws = wb['Data']
-        headers = []
-        for row in ws.iter_rows(min_row=1, max_row=1, values_only=True):
-            headers = [str(v).strip() if v is not None else '' for v in row]
-            break
-        wb.close()
-        return [h for h in headers if h]
-    except Exception:
-        return []
 
 def _excel_cache_key():
     paths = ["Analisis_Walmart.xlsx", "Analisis Walmart.xlsx"]
@@ -56,14 +26,14 @@ def _excel_cache_key():
     key = hashlib.md5(f"{p}{mtime}".encode()).hexdigest()[:16]
     return str(p), mtime, key
 
-st.set_page_config(page_title="Walmex · CFBC", layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(page_title="Walmex · CFBC", layout="wide", initial_sidebar_state="collapsed")
 
 st.markdown("""
 <style>
 .main .block-container { padding: 0 !important; max-width: 100% !important; margin: 0 !important; }
 .main { padding: 0 !important; overflow: hidden !important; }
 .stApp { margin: 0 !important; }
-[data-testid="stHeader"],[data-testid="stToolbar"],
+[data-testid="stHeader"],[data-testid="stSidebar"],[data-testid="stToolbar"],
 [data-testid="stDecoration"],[data-testid="stStatusWidget"],
 #MainMenu, header, footer {
     display: none !important; visibility: hidden !important; height: 0 !important;
@@ -78,91 +48,8 @@ iframe[src*="badge"] {
 [data-testid='stVerticalBlock'] { gap: 0 !important; padding: 0 !important; }
 div[data-testid='stHtml'] { padding: 0 !important; margin: 0 !important; line-height: 0 !important; }
 iframe { display: block !important; margin: 0 !important; border: none !important; }
-/* Sidebar siempre visible */
-[data-testid="stSidebar"] { display: flex !important; visibility: visible !important; }
-[data-testid="stSidebarNav"] { display: none !important; }
 </style>
 """, unsafe_allow_html=True)
-
-# ── Panel de configuración de columnas (sidebar) ─────────────────────────────
-_col_cfg = _load_col_config()
-
-# Botón flotante para abrir config — reabre el sidebar
-st.markdown("""
-<style>
-[data-testid="stSidebar"] { display: block !important; visibility: visible !important; }
-section[data-testid="stSidebar"] > div { padding-top: 1rem !important; }
-</style>
-""", unsafe_allow_html=True)
-
-with st.sidebar:
-    st.markdown("### ⚙️ Configurar Columnas")
-    st.markdown("Selecciona qué columna de tu Excel corresponde a cada campo.")
-
-    _hdrs = _get_excel_headers()
-
-    if not _hdrs:
-        st.warning("No se encontró el Excel. Sube Analisis_Walmart.xlsx primero.")
-    else:
-        _opts = ["(automático)"] + _hdrs
-
-        def _sel(campo, default):
-            """Devuelve el índice guardado o 0 si no está configurado."""
-            saved = _col_cfg.get(campo, "")
-            if saved in _hdrs:
-                return _opts.index(saved)
-            # buscar default en la lista
-            if default in _hdrs:
-                return _opts.index(default)
-            return 0
-
-        st.markdown("#### Columnas obligatorias")
-        c_producto  = st.selectbox("🏷 Producto",          _opts, index=_sel("producto",  "Desc Art 1"),           key="cfg_producto")
-        c_tienda    = st.selectbox("🏪 Tienda",            _opts, index=_sel("tienda",    "Nombre Tienda/Club"),   key="cfg_tienda")
-        c_semana    = st.selectbox("📅 Semana",            _opts, index=_sel("semana",    "SEM"),                  key="cfg_semana")
-        c_fecha     = st.selectbox("📆 Fecha",             _opts, index=_sel("fecha",     "Diario"),               key="cfg_fecha")
-        c_ventas    = st.selectbox("📦 Unidades Vendidas", _opts, index=_sel("ventas",    "Cnt POS"),              key="cfg_ventas")
-        c_embarque  = st.selectbox("🚚 Embarque",          _opts, index=_sel("embarque",  "Cntd Embarque"),        key="cfg_embarque")
-        c_merma     = st.selectbox("🗑 Merma (Cant VC)",   _opts, index=_sel("merma",     "Cant VC Tienda"),       key="cfg_merma")
-
-        st.markdown("#### Columnas financieras")
-        c_venta_cfbc = st.selectbox("💰 Venta CFBC",      _opts, index=_sel("venta_cfbc","Venta CFBC / Costo (Facturado)"), key="cfg_cfbc")
-        c_venta_wmx  = st.selectbox("🏬 Venta WMX",       _opts, index=_sel("venta_wmx", "Venta WMX / Precio Costo (Vendido)"), key="cfg_wmx")
-        c_retail_vc  = st.selectbox("🔖 Retail VC",       _opts, index=_sel("retail_vc", "Suma de Retail VC Tienda"), key="cfg_retail")
-        c_inventario = st.selectbox("📊 Inventario",      _opts, index=_sel("inventario","Cantidad Actual en Existentes de la tienda"), key="cfg_inv")
-
-        st.markdown("#### Columnas de días (unidades)")
-        _dias_keys = ['Dom','Lun','Mar','Mie','Jue','Vie','Sab']
-        _ctd_sel = {}
-        _vtas_sel = {}
-        with st.expander("Ver columnas por día"):
-            for _d in _dias_keys:
-                _ctd_sel[_d]  = st.selectbox(f"Ctd {_d}",   _opts, index=_sel(f"ctd_{_d.lower()}",  f"Ctd {_d}"),    key=f"cfg_ctd_{_d}")
-                _vtas_sel[_d] = st.selectbox(f"Ventas {_d}", _opts, index=_sel(f"vtas_{_d.lower()}", f"Ventas {_d}"), key=f"cfg_vtas_{_d}")
-
-        st.markdown("---")
-        if st.button("💾 Guardar configuración", use_container_width=True):
-            new_cfg = {
-                "producto":   c_producto  if c_producto  != "(automático)" else "",
-                "tienda":     c_tienda    if c_tienda    != "(automático)" else "",
-                "semana":     c_semana    if c_semana    != "(automático)" else "",
-                "fecha":      c_fecha     if c_fecha     != "(automático)" else "",
-                "ventas":     c_ventas    if c_ventas    != "(automático)" else "",
-                "embarque":   c_embarque  if c_embarque  != "(automático)" else "",
-                "merma":      c_merma     if c_merma     != "(automático)" else "",
-                "venta_cfbc": c_venta_cfbc if c_venta_cfbc != "(automático)" else "",
-                "venta_wmx":  c_venta_wmx  if c_venta_wmx  != "(automático)" else "",
-                "retail_vc":  c_retail_vc  if c_retail_vc  != "(automático)" else "",
-                "inventario": c_inventario if c_inventario != "(automático)" else "",
-                **{f"ctd_{d.lower()}":  (_ctd_sel[d]  if _ctd_sel[d]  != "(automático)" else "") for d in _dias_keys},
-                **{f"vtas_{d.lower()}": (_vtas_sel[d] if _vtas_sel[d] != "(automático)" else "") for d in _dias_keys},
-            }
-            _save_col_config(new_cfg)
-            _col_cfg.update(new_cfg)
-            st.success("✅ Configuración guardada. Recarga para aplicar.")
-            st.cache_data.clear()
-
-# ─────────────────────────────────────────────────────────────────────────────
 
 @st.cache_data(ttl=3600, show_spinner=False)
 def cargar_datos(url: str = "") -> dict:
@@ -189,51 +76,72 @@ def cargar_datos(url: str = "") -> dict:
             if h == name: return i
         raise ValueError(f'Columna "{name}" no encontrada. Encabezados: {headers}')
 
-    def col_cfg(campo, defaults):
-        """Busca columna: primero en config guardado, luego en lista de defaults."""
-        cfg = _load_col_config()
-        saved = cfg.get(campo, "")
-        if saved:
-            try: return col(saved)
-            except: pass
-        if isinstance(defaults, str):
-            defaults = [defaults]
-        for name in defaults:
-            try: return col(name)
-            except: pass
-        return None
-
     # Log headers para diagnóstico si alguna columna falla
     import sys
     _col_names = [h for h in headers if h]
+    
+    idx_producto = col('Desc Art 1')
+    idx_tienda   = col('Nombre Tienda/Club')
+    idx_semana   = col('SEM')
+    idx_fecha    = col('Diario')
+    idx_ventas   = col('Cnt POS')       # Unidades vendidas (Cnt POS)
+    idx_embarque = col('Cntd Embarque') # Unidades embarcadas
+    idx_merma_vc = col('Cant VC Tienda') # Merma (Cant VC Tienda)
+    
+    # Columnas opcionales para Tienda — intentar varios nombres posibles
+    idx_venta_cfbc = None
+    for _n in ['Venta CFBC / Costo (Facturado)', 'Venta CFBC/Costo (Facturado)',
+               'Venta CFBC', 'CFBC']:
+        try: idx_venta_cfbc = col(_n); break
+        except: pass
 
-    idx_producto = col_cfg('producto',  ['Desc Art 1'])
-    idx_tienda   = col_cfg('tienda',    ['Nombre Tienda/Club'])
-    idx_semana   = col_cfg('semana',    ['SEM'])
-    idx_fecha    = col_cfg('fecha',     ['Diario'])
-    idx_ventas   = col_cfg('ventas',    ['Cnt POS'])
-    idx_embarque = col_cfg('embarque',  ['Cntd Embarque'])
-    idx_merma_vc = col_cfg('merma',     ['Cant VC Tienda'])
+    idx_venta_wmx = None
+    for _n in ['Venta WMX / Precio Costo (Vendido)', 'Venta WMX/Precio Costo (Vendido)',
+               'Venta WMX', 'WMX']:
+        try: idx_venta_wmx = col(_n); break
+        except: pass
 
-    if idx_producto is None: raise ValueError(f"No se encontró columna Producto. Configura en ⚙️ Configurar Columnas. Disponibles: {_col_names}")
-    if idx_tienda   is None: raise ValueError(f"No se encontró columna Tienda. Configura en ⚙️ Configurar Columnas. Disponibles: {_col_names}")
-    if idx_semana   is None: raise ValueError(f"No se encontró columna Semana. Configura en ⚙️ Configurar Columnas. Disponibles: {_col_names}")
-    if idx_ventas   is None: raise ValueError(f"No se encontró columna Ventas. Configura en ⚙️ Configurar Columnas. Disponibles: {_col_names}")
-    if idx_embarque is None: raise ValueError(f"No se encontró columna Embarque. Configura en ⚙️ Configurar Columnas. Disponibles: {_col_names}")
-    if idx_merma_vc is None: raise ValueError(f"No se encontró columna Merma. Configura en ⚙️ Configurar Columnas. Disponibles: {_col_names}")
+    idx_retail_vc = None
+    for _n in ['Suma de Retail VC Tienda', 'Retail VC Tienda',
+               'Suma Retail VC Tienda', 'Retail VC', 'Suma de Retail VC',
+               'Suma de Retail VC Tienda ']:  # trailing space variant
+        try: idx_retail_vc = col(_n); break
+        except: pass
 
-    idx_venta_cfbc = col_cfg('venta_cfbc', ['Venta CFBC / Costo (Facturado)', 'Venta CFBC/Costo (Facturado)', 'Venta CFBC', 'CFBC'])
-    idx_venta_wmx  = col_cfg('venta_wmx',  ['Venta WMX / Precio Costo (Vendido)', 'Venta WMX/Precio Costo (Vendido)', 'Venta WMX', 'WMX'])
-    idx_retail_vc  = col_cfg('retail_vc',  ['Suma de Retail VC Tienda', 'Retail VC Tienda', 'Suma Retail VC Tienda', 'Retail VC', 'Suma de Retail VC', 'Suma de Retail VC Tienda '])
-    idx_inventario = col_cfg('inventario', ['Cantidad Actual en Existentes de la tienda', 'Cantidad Actual en Existentes', 'Cantidad Actual', 'Inventario Actual', 'Existentes'])
+    # Columna de inventario actual
+    idx_inventario = None
+    for _n in ['Cantidad Actual en Existentes de la tienda', 'Cantidad Actual en Existentes',
+               'Cantidad Actual', 'Inventario Actual', 'Existentes']:
+        try: idx_inventario = col(_n); break
+        except: pass
+
+    # Advertir si columnas clave no se encontraron
+    if idx_retail_vc is None:
+        import streamlit as _st
+        _st.warning(
+            f"⚠️ No se encontró columna 'Retail VC Tienda'. "
+            f"Columnas disponibles: {[h for h in headers if h and 'VC' in h or 'Retail' in h or 'retail' in h.lower() if h]}\n"
+            f"Todos los encabezados: {[h for h in headers if h]}"
+        )
+    
+    if idx_inventario is None:
+        import streamlit as _st
+        _st.warning(
+            f"⚠️ No se encontró columna 'Cantidad Actual en Existentes de la tienda'. "
+            f"Inventario no estará disponible. Columnas disponibles: {[h for h in headers if h]}"
+        )
 
     # Columnas de días de la semana (opcionales)
     _dias = ['Dom', 'Lun', 'Mar', 'Mie', 'Jue', 'Vie', 'Sab']
     idx_ctd   = {}
     idx_vtas  = {}
     for d in _dias:
-        idx_ctd[d]  = col_cfg(f'ctd_{d.lower()}',  [f'Ctd {d}', f'Cnt {d}'])
-        idx_vtas[d] = col_cfg(f'vtas_{d.lower()}', [f'Ventas {d}'])
+        try: idx_ctd[d] = col(f'Ctd {d}')
+        except: 
+            try: idx_ctd[d] = col(f'Cnt {d}')
+            except: idx_ctd[d] = None
+        try: idx_vtas[d] = col(f'Ventas {d}')
+        except: idx_vtas[d] = None
 
     records = []
     for row in ws.iter_rows(min_row=2, values_only=True):
