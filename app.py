@@ -101,12 +101,8 @@ def cargar_datos(url: str = "") -> dict:
         except: pass
 
     idx_retail_vc = None
-    for _n in ['Costo VC Tienda',
-               'Suma de Retail VC Tienda', 'Retail VC Tienda',
-               'Suma Retail VC Tienda', 'Retail VC', 'Suma de Retail VC',
-               'Suma de Retail VC Tienda ']:  # trailing space variant
-        try: idx_retail_vc = col(_n); break
-        except: pass
+    try: idx_retail_vc = col('Costo VC Tienda')
+    except: pass
 
     # Columna de inventario actual
     idx_inventario = None
@@ -120,8 +116,8 @@ def cargar_datos(url: str = "") -> dict:
         import streamlit as _st
         _st.warning(
             f"⚠️ No se encontró columna 'Costo VC Tienda'. "
-            f"Columnas disponibles: {[h for h in headers if h and ('VC' in h or 'Costo' in h or 'Retail' in h)]}\n"
-            f"Todos los encabezados: {[h for h in headers if h]}"
+            f"La columna Cantidad $ en Top Merma no estará disponible. "
+            f"Columnas disponibles: {[h for h in headers if h and ('VC' in h or 'Costo' in h or 'Retail' in h)]}"
         )
     
     if idx_inventario is None:
