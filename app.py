@@ -486,13 +486,39 @@ html,body{height:auto;overflow-y:auto}
 #viewGasto .unidad-row td{font-size:.60rem}
 #viewGasto .unidad-row td:first-child{padding-left:16px;color:#555}
 #viewGasto .grand-total td{background:#0071ce;color:white;font-weight:700;border-top:3px solid #004a8a;font-size:.64rem}
+.box-hdr{position:relative}
+.btn-export{position:absolute;right:6px;top:50%;transform:translateY(-50%);padding:2px 7px;font-size:.60rem;font-weight:700;background:#217346;color:#fff;border:none;border-radius:3px;cursor:pointer;z-index:10;white-space:nowrap;line-height:1.4}
+.btn-export:hover{background:#1a5c38}
+#exportModal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;align-items:center;justify-content:center}
+#exportModal.open{display:flex}
+.modal-box{background:#fff;border-radius:8px;padding:20px 24px;min-width:270px;box-shadow:0 4px 28px rgba(0,0,0,.25);font-family:Arial,sans-serif}
+.modal-box h3{font-size:.85rem;color:#0071ce;margin-bottom:12px;font-weight:700}
+.modal-box label{font-size:.73rem;color:#555;display:block;margin-bottom:4px}
+.modal-box input{border:1px solid #bbb;border-radius:4px;padding:5px 10px;font-size:.8rem;width:100%;box-sizing:border-box;margin-bottom:14px}
+.modal-box .btns{display:flex;gap:8px;justify-content:flex-end}
+.modal-box .btns button{padding:5px 14px;border:none;border-radius:4px;cursor:pointer;font-size:.73rem;font-weight:700}
+.modal-btn-ok{background:#217346;color:#fff}.modal-btn-ok:hover{background:#1a5c38}
+.modal-btn-cancel{background:#eee;color:#444}.modal-btn-cancel:hover{background:#ddd}
 </style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 <body>
 
 <div id="loader">
   <div class="ld-txt">Cargando...</div>
   <div class="ld-bar"><div class="ld-fill"></div></div>
+</div>
+
+<div id="exportModal">
+  <div class="modal-box">
+    <h3 id="modalTitle">Exportar a Excel</h3>
+    <label>Celda de inicio (ej. A1, B3, C10):</label>
+    <input id="modalCell" type="text" value="A1" placeholder="A1" maxlength="10">
+    <div class="btns">
+      <button class="modal-btn-cancel" onclick="closeExportModal()">Cancelar</button>
+      <button class="modal-btn-ok" onclick="doExport()">⬇ Exportar</button>
+    </div>
+  </div>
 </div>
 
 <div id="app" style="display:none">
@@ -539,22 +565,22 @@ html,body{height:auto;overflow-y:auto}
 
   <div class="grid" id="viewProducto">
     <div class="box">
-      <div class="box-hdr">Ventas Históricas</div>
+      <div class="box-hdr">Ventas Históricas<button class="btn-export" onclick="openExportModal('tHist','Ventas Históricas')">⬇ xls</button></div>
       <table class="t"><thead><tr><th>Producto</th><th>12 Semanas</th><th>3 Semanas</th></tr></thead>
       <tbody id="tHist"></tbody></table>
     </div>
     <div class="box">
-      <div class="box-hdr">Índice de Merma por Artículo Últimas 3 Semanas</div>
+      <div class="box-hdr">Índice de Merma por Artículo Últimas 3 Semanas<button class="btn-export" onclick="openExportModal('tMerma','Indice Merma')">⬇ xls</button></div>
       <table class="t"><thead><tr><th>Producto</th><th>Embarque</th><th>Merma</th><th>Merma %</th></tr></thead>
       <tbody id="tMerma"></tbody></table>
     </div>
     <div class="box">
-      <div class="box-hdr">Venta Promedio Semanal</div>
+      <div class="box-hdr">Venta Promedio Semanal<button class="btn-export" onclick="openExportModal('tAvg','Venta Promedio')">⬇ xls</button></div>
       <table class="t"><thead><tr><th>Producto</th><th>Prom 12 Sem</th><th>Prom 3 Sem</th></tr></thead>
       <tbody id="tAvg"></tbody></table>
     </div>
     <div class="box">
-      <div class="box-hdr" id="projTitle">Proyección Semana Siguiente</div>
+      <div class="box-hdr" id="projTitle"><span id="projTitleText">Proyección Semana Siguiente</span><button class="btn-export" onclick="openExportModal('tProj',document.getElementById('projTitleText').textContent)">⬇ xls</button></div>
       <table class="t"><thead><tr><th>Producto</th><th>Proyección</th></tr></thead>
       <tbody id="tProj"></tbody></table>
     </div>
@@ -562,27 +588,27 @@ html,body{height:auto;overflow-y:auto}
 
   <div class="grid" id="viewTienda" style="display:none">
     <div class="box">
-      <div class="box-hdr">Top Venta</div>
+      <div class="box-hdr">Top Venta<button class="btn-export" onclick="openExportModal('tHistT','Top Venta Tiendas')">⬇ xls</button></div>
       <table class="t"><thead><tr><th>Tienda</th><th>UNIDADES</th><th>VENTA CFBC</th><th>VENTA WMX</th><th>%</th></tr></thead>
       <tbody id="tHistT"></tbody></table>
     </div>
     <div class="box">
-      <div class="box-hdr">Top Merma</div>
+      <div class="box-hdr">Top Merma<button class="btn-export" onclick="openExportModal('tMermaT','Top Merma Tiendas')">⬇ xls</button></div>
       <table class="t"><thead><tr><th>Tienda</th><th>UNIDADES</th><th>$</th><th>CANTIDAD</th><th>%</th></tr></thead>
       <tbody id="tMermaT"></tbody></table>
     </div>
     <div class="box" id="boxAvgT" style="display:none">
-      <div class="box-hdr" id="avgTTitle">Venta Promedio Semanal</div>
+      <div class="box-hdr" id="avgTTitle"><span id="avgTTitleText">Venta Promedio Semanal</span><button class="btn-export" onclick="openExportModal('tAvgT',document.getElementById('avgTTitleText').textContent)">⬇ xls</button></div>
       <table class="t"><thead><tr><th>Producto</th><th>Venta CFBC</th><th>Venta WMX</th><th>Unidades</th></tr></thead>
       <tbody id="tAvgT"></tbody></table>
     </div>
     <div class="box" id="boxProjT" style="display:none">
-      <div class="box-hdr" id="projTTitle">Comparacion Ultimas 3 Semanas</div>
+      <div class="box-hdr" id="projTTitle"><span id="projTTitleText">Comparacion Ultimas 3 Semanas</span><button class="btn-export" onclick="openExportModal('tProjT',document.getElementById('projTTitleText').textContent)">⬇ xls</button></div>
       <table class="t"><thead><tr><th>Merma Producto</th><th>Unidades</th><th>Cantidad</th></tr></thead>
       <tbody id="tProjT"></tbody></table>
     </div>
     <div class="box" id="boxDiasT" style="display:none; grid-column: 1 / -1; overflow-x: auto;">
-      <div class="box-hdr">Ventas por Día</div>
+      <div class="box-hdr">Ventas por Día<button class="btn-export" onclick="openExportModal('tDiasT','Ventas por Dia')">⬇ xls</button></div>
       <table class="t" style="min-width: 800px;">
         <thead>
           <tr>
@@ -599,14 +625,14 @@ html,body{height:auto;overflow-y:auto}
   <!-- Vista Inventario Actual -->
   <div class="grid" id="viewInventario" style="display:none">
     <div class="box">
-      <div class="box-hdr">Total Inventario por Tienda</div>
+      <div class="box-hdr">Total Inventario por Tienda<button class="btn-export" onclick="openExportModal('tInvTienda','Inventario por Tienda')">⬇ xls</button></div>
       <table class="t">
         <thead><tr><th>Tienda</th><th>Inventario Total</th></tr></thead>
         <tbody id="tInvTienda"></tbody>
       </table>
     </div>
     <div class="box">
-      <div class="box-hdr" id="invProductoTitle">Total Inventario por Producto</div>
+      <div class="box-hdr" id="invProductoTitle"><span id="invProductoTitleText">Total Inventario por Producto</span><button class="btn-export" onclick="openExportModal('tInvProducto','Inventario por Producto')">⬇ xls</button></div>
       <table class="t">
         <thead><tr><th>Producto</th><th>Inventario Total</th></tr></thead>
         <tbody id="tInvProducto"></tbody>
@@ -618,7 +644,7 @@ html,body{height:auto;overflow-y:auto}
   <div id="viewGasto" style="display:none; padding:12px 20px; overflow:visible !important; height:auto !important;">
     <div id="gastoGrid" style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; overflow:visible !important; height:auto !important;">
       <div class="box" style="overflow:visible !important; height:auto !important;">
-        <div class="box-hdr">Presupuesto por Ruta</div>
+        <div class="box-hdr">Presupuesto por Ruta<button class="btn-export" onclick="openExportModal('tGastoBody','Presupuesto por Ruta')">⬇ xls</button></div>
         <div style="overflow:visible !important; height:auto !important;">
           <table class="t" id="tGasto">
             <thead id="tGastoHead"></thead>
@@ -915,10 +941,7 @@ function updateHeader(){
     var fN = (DATA.fecha_por_semana && (DATA.fecha_por_semana[String(sN)] || DATA.fecha_por_semana[sN])) || '—';
     document.getElementById('hdrFecha').textContent  = f0 + ' — ' + fN;
     document.getElementById('hdrSem').textContent    = 'Global';
-    document.getElementById('projTitle').textContent = 'Proyección';
-    return;
-  }
-  if(sems.length > 1){
+    document.getElementById('projTitleText').textContent = 'Proyección';
     // Incluir año cuando hay semanas de distintos años para evitar "1, 1" duplicados
     var primerAnio = sems.find(function(s){ return s > 9999 ? Math.floor(s/100) : null; });
     primerAnio = primerAnio ? Math.floor(primerAnio/100) : null;
@@ -930,7 +953,7 @@ function updateHeader(){
     });
     document.getElementById('hdrFecha').textContent  = sems.length + ' semanas seleccionadas';
     document.getElementById('hdrSem').textContent    = 'Sem ' + semNums.join(', ');
-    document.getElementById('projTitle').textContent = 'Proyección';
+    document.getElementById('projTitleText').textContent = 'Proyección';
     return;
   }
   var semKey = String(state.semana);
@@ -943,7 +966,7 @@ function updateHeader(){
   var semNum = state.semana > 9999 ? state.semana%100 : state.semana;
   var semAnio = state.semana > 9999 ? Math.floor(state.semana/100) : '';
   document.getElementById('hdrSem').textContent     = (semAnio ? semAnio+' · ' : '')+'Semana '+String(semNum).padStart(2,'0');
-  document.getElementById('projTitle').textContent  = 'Proyección Semana '+(semNum+1);
+  document.getElementById('projTitleText').textContent  = 'Proyección Semana '+(semNum+1);
 }
 
 function getSemanasActivas(){
@@ -1139,8 +1162,8 @@ function renderTienda(){
   if(state.tiendaT){
     var tSel = state.tiendaT;
     var tName = tSel.replace('SC ','');
-    document.getElementById('avgTTitle').textContent  = 'Venta — '+tName;
-    document.getElementById('projTTitle').textContent = 'Merma — '+tName;
+    document.getElementById('avgTTitleText').textContent  = 'Venta — '+tName;
+    document.getElementById('projTTitleText').textContent = 'Merma — '+tName;
 
     var totVenta=0, totWmx=0, totUnid=0, totMermaU=0, totMermaR=0;
     var tDias = {cs:0,cd:0,cl:0,cma:0,cmi:0,cj:0,cv:0,
@@ -1210,8 +1233,8 @@ function renderTienda(){
       qT(tDias.vs, '$')+qT(tDias.vd, '$')+qT(tDias.vl, '$')+qT(tDias.vma, '$')+qT(tDias.vmi, '$')+qT(tDias.vj, '$')+qT(tDias.vv, '$')+'</tr>';
 
   } else {
-    document.getElementById('avgTTitle').textContent  = 'Venta Promedio Semanal';
-    document.getElementById('projTTitle').textContent = 'Comparacion Ultimas 3 Semanas';
+    document.getElementById('avgTTitleText').textContent  = 'Venta Promedio Semanal';
+    document.getElementById('projTTitleText').textContent = 'Comparacion Ultimas 3 Semanas';
 
     var totVenta=0, totWmx=0, totUnid=0, totMermaU=0, totMermaR=0;
     // Construir array sumando todas las tiendas
@@ -1344,7 +1367,8 @@ function renderInventario(){
     });
   }
   
-  document.getElementById('invProductoTitle').innerHTML = title;
+  var titleEl = document.getElementById('invProductoTitleText') || document.getElementById('invProductoTitle');
+  if(titleEl) titleEl.innerHTML = title;
   document.getElementById('tInvProducto').innerHTML = rowsProducto;
 }
 
@@ -1473,7 +1497,7 @@ function imprimirReporte(){
   var tienda  = document.getElementById('hdrTienda').textContent;
   var semana  = document.getElementById('hdrSem').textContent;
   var fecha   = document.getElementById('hdrFecha').textContent;
-  var projTit = document.getElementById('projTitle').textContent;
+  var projTit = document.getElementById('projTitleText').textContent;
   var tHist   = document.getElementById('tHist').innerHTML;
   var tMerma  = document.getElementById('tMerma').innerHTML;
   var tAvg    = document.getElementById('tAvg').innerHTML;
@@ -1558,6 +1582,119 @@ function imprimirReporte(){
   // Liberar URL de objeto cuando la ventana cargue
   if(win){ win.addEventListener('load', function(){ URL.revokeObjectURL(url); }); }
 }
+
+// ─── EXPORT TO EXCEL ─────────────────────────────────────────────────────────
+var _exportTableId = '';
+var _exportTitle   = '';
+
+function openExportModal(tableId, title){
+  _exportTableId = tableId;
+  _exportTitle   = title || tableId;
+  document.getElementById('modalTitle').textContent = 'Exportar: ' + _exportTitle;
+  document.getElementById('modalCell').value = 'A1';
+  document.getElementById('exportModal').classList.add('open');
+  setTimeout(function(){ document.getElementById('modalCell').select(); }, 80);
+}
+
+function closeExportModal(){
+  document.getElementById('exportModal').classList.remove('open');
+}
+
+function parseCell(ref){
+  // Returns {c: colIndex0, r: rowIndex0}
+  ref = (ref || 'A1').toUpperCase().trim();
+  var m = ref.match(/^([A-Z]+)(\d+)$/);
+  if(!m) return {c:0, r:0};
+  var col = 0;
+  for(var i=0;i<m[1].length;i++) col = col*26 + (m[1].charCodeAt(i)-64);
+  return {c: col-1, r: parseInt(m[2])-1};
+}
+
+function doExport(){
+  var cellRef = document.getElementById('modalCell').value || 'A1';
+  var origin  = parseCell(cellRef);
+  closeExportModal();
+
+  // Gather header row from thead of the parent table
+  var tbody = document.getElementById(_exportTableId);
+  if(!tbody){ alert('Tabla no encontrada: ' + _exportTableId); return; }
+
+  // Find the closest <table>
+  var tbl = tbody.closest ? tbody.closest('table') : tbody.parentNode;
+  while(tbl && tbl.tagName !== 'TABLE') tbl = tbl.parentNode;
+
+  var wb = XLSX.utils.book_new();
+  var wsData = [];
+
+  // Header from thead (if exists in same table)
+  if(tbl){
+    var thead = tbl.querySelector('thead');
+    if(thead){
+      var hrow = [];
+      thead.querySelectorAll('tr').forEach(function(tr){
+        var row = [];
+        tr.querySelectorAll('th,td').forEach(function(cell){
+          row.push(cell.innerText || cell.textContent || '');
+        });
+        hrow = row;
+      });
+      if(hrow.length) wsData.push(hrow);
+    }
+  } else {
+    // Gasto: thead is a sibling
+    var headEl = document.getElementById('tGastoHead');
+    if(headEl){
+      headEl.querySelectorAll('tr').forEach(function(tr){
+        var row = [];
+        tr.querySelectorAll('th,td').forEach(function(cell){
+          row.push(cell.innerText || cell.textContent || '');
+        });
+        wsData.push(row);
+      });
+    }
+  }
+
+  // Data rows from tbody
+  tbody.querySelectorAll('tr').forEach(function(tr){
+    var row = [];
+    tr.querySelectorAll('td').forEach(function(cell){
+      var txt = (cell.innerText || cell.textContent || '').trim();
+      // Try to parse as number (remove $ and ,)
+      var num = parseFloat(txt.replace(/[$,]/g,''));
+      row.push(isNaN(num) ? txt : num);
+    });
+    if(row.length) wsData.push(row);
+  });
+
+  var ws = XLSX.utils.aoa_to_sheet(wsData, {origin: {r: origin.r, c: origin.c}});
+
+  // Auto column width
+  var maxCols = 0;
+  wsData.forEach(function(r){ if(r.length > maxCols) maxCols = r.length; });
+  var colWidths = [];
+  for(var ci=0;ci<maxCols;ci++){
+    var maxLen = 10;
+    wsData.forEach(function(r){
+      var val = r[ci] !== undefined ? String(r[ci]) : '';
+      if(val.length > maxLen) maxLen = val.length;
+    });
+    colWidths.push({wch: Math.min(maxLen+2, 40)});
+  }
+  ws['!cols'] = colWidths;
+
+  var safeName = _exportTitle.replace(/[\/\\?*\[\]]/g,'').substring(0,31);
+  XLSX.utils.book_append_sheet(wb, ws, safeName || 'Datos');
+  XLSX.writeFile(wb, safeName + '.xlsx');
+}
+
+// Close modal clicking outside
+document.addEventListener('click', function(e){
+  var modal = document.getElementById('exportModal');
+  if(modal && modal.classList.contains('open')){
+    if(e.target === modal) closeExportModal();
+  }
+});
+// ─────────────────────────────────────────────────────────────────────────────
 
 window.addEventListener('load', init);
 
