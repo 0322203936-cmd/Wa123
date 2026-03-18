@@ -26,6 +26,22 @@ def _excel_cache_key():
     key = hashlib.md5(f"{p}{mtime}".encode()).hexdigest()[:16]
     return str(p), mtime, key
 
+@st.cache_data(show_spinner=False)
+def get_excel_headers() -> list:
+    """Lee sólo la fila de encabezados del Excel (muy rápido)."""
+    paths = ["Analisis_Walmart.xlsx", "Analisis Walmart.xlsx"]
+    excel_path = next((p for p in paths if Path(p).exists()), None)
+    if not excel_path:
+        return []
+    try:
+        wb = openpyxl.load_workbook(excel_path, data_only=True, read_only=True)
+        ws = wb['Data']
+        headers = [str(c.value).strip() if c.value else '' for c in next(ws.iter_rows(min_row=1, max_row=1))]
+        wb.close()
+        return [h for h in headers if h]
+    except Exception:
+        return []
+
 st.set_page_config(page_title="Walmex · CFBC", layout="wide", initial_sidebar_state="collapsed")
 
 st.markdown("""
@@ -51,17 +67,145 @@ iframe { display: block !important; margin: 0 !important; border: none !importan
 </style>
 """, unsafe_allow_html=True)
 
+# ──────────────────────────────────────────────
+# CONFIGURACIÓN DE COLUMNAS
+# ──────────────────────────────────────────────
+_FIELDS = [
+    # (key, etiqueta, nombre_por_defecto, requerido)
+    ('producto',   '📦 Producto / Descripción',      'Desc Art 1',                         True),
+    ('tienda',     '🏪 Tienda / Club',               'Nombre Tienda/Club',                 True),
+    ('semana',     '📅 Número de Semana',             'SEM',                                True),
+    ('fecha',      '🗓️ Fecha (Diario)',               'Diario',                             True),
+    ('ventas',     '🛒 Ventas Unidades (Cnt POS)',    'Cnt POS',                            True),
+    ('embarque',   '🚚 Embarque Unidades',            'Cntd Embarque',                      True),
+    ('merma_vc',   '🗑️ Merma (Cant VC Tienda)',       'Cant VC Tienda',                     True),
+    ('venta_cfbc', '💰 Venta CFBC / Costo',           'Venta CFBC / Costo (Facturado)',     False),
+    ('venta_wmx',  '💵 Venta WMX / Precio Costo',     'Venta WMX / Precio Costo (Vendido)', False),
+    ('retail_vc',  '🏷️ Retail VC Tienda',             'Suma de Retail VC Tienda',           False),
+    ('inventario', '📊 Inventario Actual',             'Cantidad Actual en Existentes de la tienda', False),
+]
+_DIAS = ['Dom', 'Lun', 'Mar', 'Mie', 'Jue', 'Vie', 'Sab']
+
+def _default_col_mapping(headers):
+    """Intenta asignar automáticamente columnas buscando nombres alternativos conocidos."""
+    _alternatives = {
+        'venta_cfbc': ['Venta CFBC / Costo (Facturado)', 'Venta CFBC/Costo (Facturado)', 'Venta CFBC', 'CFBC'],
+        'venta_wmx':  ['Venta WMX / Precio Costo (Vendido)', 'Venta WMX/Precio Costo (Vendido)', 'Venta WMX', 'WMX'],
+        'retail_vc':  ['Suma de Retail VC Tienda', 'Suma de Retail VC Tienda ', 'Retail VC Tienda', 'Retail VC'],
+        'inventario': ['Cantidad Actual en Existentes de la tienda', 'Cantidad Actual en Existentes', 'Inventario Actual', 'Existentes'],
+    }
+    mapping = {}
+    for key, _, default, _ in _FIELDS:
+        alts = _alternatives.get(key, [default])
+        found = next((h for h in alts if h in headers), None)
+        mapping[key] = found
+    for d in _DIAS:
+        dl = d.lower()
+        mapping[f'ctd_{dl}']  = next((h for h in [f'Ctd {d}', f'Cnt {d}'] if h in headers), None)
+        mapping[f'vtas_{dl}'] = f'Ventas {d}' if f'Ventas {d}' in headers else None
+    return mapping
+
+def show_column_config():
+    """Muestra la pantalla de mapeo de columnas y devuelve True cuando el usuario confirma."""
+    headers = get_excel_headers()
+    if not headers:
+        st.error("❌ No se encontró el archivo Excel. Asegúrate de que 'Analisis_Walmart.xlsx' esté en el repositorio.")
+        st.stop()
+
+    options_req  = headers           # sólo encabezados (campos requeridos)
+    options_opt  = ['(no usar)'] + headers
+
+    # Inicializar valores del widget con auto-detección
+    auto = _default_col_mapping(headers)
+    for key, _, _, _ in _FIELDS:
+        sk = f'col_{key}'
+        if sk not in st.session_state:
+            default = auto.get(key)
+            if default and default in options_req:
+                st.session_state[sk] = default
+
+    st.markdown("## ⚙️ Configuración de Columnas del Excel")
+    st.caption("Asigna qué columna de tu archivo Excel corresponde a cada campo. "
+               "Los campos con ✱ son obligatorios.")
+
+    col_a, col_b = st.columns(2)
+    for i, (key, label, _, required) in enumerate(_FIELDS):
+        sk = f'col_{key}'
+        target_col = col_a if i % 2 == 0 else col_b
+        opts = options_req if required else options_opt
+        cur  = st.session_state.get(sk)
+        try:
+            idx = opts.index(cur) if cur in opts else 0
+        except ValueError:
+            idx = 0
+        target_col.selectbox(
+            f"{'✱ ' if required else ''}{label}",
+            options=opts,
+            index=idx,
+            key=sk,
+        )
+
+    with st.expander("📅 Columnas por Día de la Semana (opcionales)", expanded=False):
+        day_cols = st.columns(4)
+        for i, d in enumerate(_DIAS):
+            dl = d.lower()
+            for prefix, lbl in [('ctd', f'Cantidad {d}'), ('vtas', f'Ventas {d}')]:
+                sk2 = f'col_{prefix}_{dl}'
+                if sk2 not in st.session_state:
+                    default2 = auto.get(f'{prefix}_{dl}')
+                    st.session_state[sk2] = default2 if default2 else '(no usar)'
+                day_cols[i % 4].selectbox(
+                    lbl, options=options_opt,
+                    index=options_opt.index(st.session_state[sk2]) if st.session_state[sk2] in options_opt else 0,
+                    key=sk2,
+                )
+
+    st.markdown("---")
+    btn_col, info_col = st.columns([1, 3])
+    if btn_col.button("✅ Guardar y cargar datos", type="primary", use_container_width=True):
+        # Validar campos requeridos
+        missing = [lbl for key, lbl, _, req in _FIELDS
+                   if req and not st.session_state.get(f'col_{key}')]
+        if missing:
+            st.error(f"⚠️ Faltan campos requeridos: {', '.join(missing)}")
+        else:
+            # Construir mapping final
+            final_mapping = {}
+            for key, _, _, _ in _FIELDS:
+                v = st.session_state.get(f'col_{key}')
+                final_mapping[key] = v if v and v != '(no usar)' else None
+            for d in _DIAS:
+                dl = d.lower()
+                for prefix in ('ctd', 'vtas'):
+                    v = st.session_state.get(f'col_{prefix}_{dl}')
+                    final_mapping[f'{prefix}_{dl}'] = v if v and v != '(no usar)' else None
+            st.session_state['col_mapping']    = final_mapping
+            st.session_state['col_configured'] = True
+            # Limpiar caché de datos para que se recarguen con el nuevo mapping
+            cargar_datos.clear()
+            st.rerun()
+    info_col.info("Los campos opcionales pueden dejarse en '(no usar)' si no existen en tu Excel.")
+
+# Mostrar pantalla de configuración si aún no se ha configurado
+if not st.session_state.get('col_configured', False):
+    show_column_config()
+    st.stop()
+
+# Botón discreto para volver a configurar columnas
+with st.sidebar:
+    if st.button("⚙️ Reconfigurar columnas"):
+        st.session_state['col_configured'] = False
+        cargar_datos.clear()
+        st.rerun()
+
+
 @st.cache_data(ttl=3600, show_spinner=False)
-def cargar_datos(url: str = "") -> dict:
+def cargar_datos(col_mapping: dict = None, url: str = "") -> dict:
     excel_path, _, cache_key = _excel_cache_key()
     if not excel_path:
         raise FileNotFoundError("No se encontró Analisis_Walmart.xlsx. Súbelo al repo de GitHub.")
-    # Caché en disco: si el Excel no cambió, cargar al instante
     _CACHE_DIR.mkdir(parents=True, exist_ok=True)
     data_cache_file = _CACHE_DIR / f"data_{cache_key}.pkl"
-    # if data_cache_file.exists():
-    #     with open(data_cache_file, "rb") as f:
-    #         return pickle.load(f)
     wb = openpyxl.load_workbook(excel_path, data_only=True)
     ws = wb['Data']
 
@@ -69,79 +213,43 @@ def cargar_datos(url: str = "") -> dict:
         try: return float(v) if v is not None else 0.0
         except: return 0.0
 
-    # Mapear columnas por nombre de encabezado — fila 1
     headers = [str(c.value).strip() if c.value else '' for c in ws[1]]
     def col(name):
         for i, h in enumerate(headers):
             if h == name: return i
         raise ValueError(f'Columna "{name}" no encontrada. Encabezados: {headers}')
 
-    # Log headers para diagnóstico si alguna columna falla
+    m = col_mapping or {}
+
+    def _col_from_mapping(key, default_name):
+        name = m.get(key) or default_name
+        return col(name)
+
+    def _col_opt(key):
+        name = m.get(key)
+        if not name: return None
+        try: return col(name)
+        except ValueError: return None
+
     import sys
-    _col_names = [h for h in headers if h]
-    
-    idx_producto = col('Desc Art 1')
-    idx_tienda   = col('Nombre Tienda/Club')
-    idx_semana   = col('SEM')
-    idx_fecha    = col('Diario')
-    idx_ventas   = col('Cnt POS')       # Unidades vendidas (Cnt POS)
-    idx_embarque = col('Cntd Embarque') # Unidades embarcadas
-    idx_merma_vc = col('Cant VC Tienda') # Merma (Cant VC Tienda)
-    
-    # Columnas opcionales para Tienda — intentar varios nombres posibles
-    idx_venta_cfbc = None
-    for _n in ['Venta CFBC / Costo (Facturado)', 'Venta CFBC/Costo (Facturado)',
-               'Venta CFBC', 'CFBC']:
-        try: idx_venta_cfbc = col(_n); break
-        except: pass
 
-    idx_venta_wmx = None
-    for _n in ['Venta WMX / Precio Costo (Vendido)', 'Venta WMX/Precio Costo (Vendido)',
-               'Venta WMX', 'WMX']:
-        try: idx_venta_wmx = col(_n); break
-        except: pass
+    idx_producto = _col_from_mapping('producto',  'Desc Art 1')
+    idx_tienda   = _col_from_mapping('tienda',    'Nombre Tienda/Club')
+    idx_semana   = _col_from_mapping('semana',    'SEM')
+    idx_fecha    = _col_from_mapping('fecha',     'Diario')
+    idx_ventas   = _col_from_mapping('ventas',    'Cnt POS')
+    idx_embarque = _col_from_mapping('embarque',  'Cntd Embarque')
+    idx_merma_vc = _col_from_mapping('merma_vc',  'Cant VC Tienda')
 
-    idx_retail_vc = None
-    for _n in ['Suma de Retail VC Tienda', 'Retail VC Tienda',
-               'Suma Retail VC Tienda', 'Retail VC', 'Suma de Retail VC',
-               'Suma de Retail VC Tienda ']:  # trailing space variant
-        try: idx_retail_vc = col(_n); break
-        except: pass
+    idx_venta_cfbc = _col_opt('venta_cfbc')
+    idx_venta_wmx  = _col_opt('venta_wmx')
+    idx_retail_vc  = _col_opt('retail_vc')
+    idx_inventario = _col_opt('inventario')
 
-    # Columna de inventario actual
-    idx_inventario = None
-    for _n in ['Cantidad Actual en Existentes de la tienda', 'Cantidad Actual en Existentes',
-               'Cantidad Actual', 'Inventario Actual', 'Existentes']:
-        try: idx_inventario = col(_n); break
-        except: pass
-
-    # Advertir si columnas clave no se encontraron
-    if idx_retail_vc is None:
-        import streamlit as _st
-        _st.warning(
-            f"⚠️ No se encontró columna 'Retail VC Tienda'. "
-            f"Columnas disponibles: {[h for h in headers if h and 'VC' in h or 'Retail' in h or 'retail' in h.lower() if h]}\n"
-            f"Todos los encabezados: {[h for h in headers if h]}"
-        )
-    
-    if idx_inventario is None:
-        import streamlit as _st
-        _st.warning(
-            f"⚠️ No se encontró columna 'Cantidad Actual en Existentes de la tienda'. "
-            f"Inventario no estará disponible. Columnas disponibles: {[h for h in headers if h]}"
-        )
-
-    # Columnas de días de la semana (opcionales)
     _dias = ['Dom', 'Lun', 'Mar', 'Mie', 'Jue', 'Vie', 'Sab']
-    idx_ctd   = {}
-    idx_vtas  = {}
-    for d in _dias:
-        try: idx_ctd[d] = col(f'Ctd {d}')
-        except: 
-            try: idx_ctd[d] = col(f'Cnt {d}')
-            except: idx_ctd[d] = None
-        try: idx_vtas[d] = col(f'Ventas {d}')
-        except: idx_vtas[d] = None
+    idx_ctd  = {d: _col_opt(f'ctd_{d.lower()}')  for d in _dias}
+    idx_vtas = {d: _col_opt(f'vtas_{d.lower()}') for d in _dias}
+
 
     records = []
     for row in ws.iter_rows(min_row=2, values_only=True):
@@ -407,7 +515,7 @@ def cargar_datos(url: str = "") -> dict:
     return result_dict
 
 try:
-    DATA = cargar_datos()
+    DATA = cargar_datos(col_mapping=st.session_state.get('col_mapping'))
 except Exception as e:
     st.error(f"❌ Error cargando datos: {e}")
     st.stop()
