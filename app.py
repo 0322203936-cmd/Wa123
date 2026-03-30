@@ -689,6 +689,13 @@ body{background:#fff;font-family:Arial,sans-serif;font-size:12px;color:#111}
   cursor:pointer;transition:.15s;white-space:nowrap;flex-shrink:0;
 }
 .btn-reload:hover{border-color:#0071ce;color:#0071ce}
+.btn-gear{
+  display:inline-flex;align-items:center;
+  padding:4px 7px;border-radius:4px;border:none;
+  background:transparent;color:#ccc;font-size:.8rem;
+  cursor:pointer;transition:.15s;flex-shrink:0;
+}
+.btn-gear:hover{color:#555}
 .ctrl{display:flex;align-items:center;gap:8px;padding:5px 16px;background:#f5f7fa;border-bottom:1px solid #ddd;flex-wrap:wrap}
 .ctrl label{font-size:.7rem;color:#555;font-weight:600}
 select{border:1px solid #bbb;border-radius:4px;padding:3px 7px;font-size:.72rem;cursor:pointer;background:#fff}
@@ -764,6 +771,7 @@ html,body{height:auto;overflow-y:auto}
       </div>
       <button class="btn-print" onclick="imprimirReporte()">🖨️ Imprimir</button>
       <button class="btn-reload" onclick="recargarDatos()" title="Actualizar datos">↺</button>
+      <button class="btn-gear" onclick="abrirPanel()" title="Actualizar datos SharePoint">⚙</button>
     </div>
   </div>
   <div class="hdr-tienda">Nombre de Tienda&nbsp;&nbsp;<strong id="hdrTienda">—</strong></div>
@@ -1738,6 +1746,13 @@ function recargarDatos(){
   }
 }
 
+function abrirPanel(){
+  try{
+    var base = window.parent.location.href.split('?')[0];
+    window.parent.location.href = base + '?gear=1';
+  }catch(e){}
+}
+
 function imprimirReporte(){
   var tienda  = document.getElementById('hdrTienda').textContent;
   var semana  = document.getElementById('hdrSem').textContent;
@@ -1910,48 +1925,13 @@ if params.get("reload") == ["1"]:
 if "show_upload" not in st.session_state:
     st.session_state["show_upload"] = False
 
-# CSS: tuerquita pequeña fija arriba-derecha usando un botón nativo de Streamlit
-st.markdown("""
-<style>
-div[data-testid="stButton"][id="gear_wrap"] > button,
-button[key="gear_btn"] {
-    position: fixed !important;
-    top: 6px !important;
-    right: 10px !important;
-    z-index: 99999 !important;
-    background: transparent !important;
-    border: none !important;
-    box-shadow: none !important;
-    color: #bbb !important;
-    font-size: 13px !important;
-    padding: 2px 4px !important;
-    min-height: 0 !important;
-    line-height: 1 !important;
-    width: auto !important;
-}
-button[key="gear_btn"]:hover { color: #555 !important; }
-/* Apuntar al botón por posición en el DOM — último botón pequeño fijo */
-section.main > div > div > div > div:last-child button {
-    position: fixed !important;
-    top: 6px !important;
-    right: 10px !important;
-    z-index: 99999 !important;
-    background: transparent !important;
-    border: none !important;
-    box-shadow: none !important;
-    color: #bbb !important;
-    font-size: 13px !important;
-    padding: 2px 4px !important;
-    min-height: 0 !important;
-}
-</style>
-""", unsafe_allow_html=True)
-
-if st.button("⚙", key="gear_btn", help="Actualizar datos"):
-    st.session_state["show_upload"] = not st.session_state["show_upload"]
+# Detectar clic desde query param (viene del botón ⚙ dentro del dashboard HTML)
+if st.query_params.get("gear") == "1":
+    st.session_state["show_upload"] = True
+    st.query_params.clear()
     st.rerun()
 
-# Panel de subida — aparece solo cuando se activa
+# Panel de subida — aparece arriba cuando se activa desde la tuerca
 if st.session_state.get("show_upload"):
     with st.container():
         st.markdown("---")
