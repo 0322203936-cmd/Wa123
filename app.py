@@ -1903,29 +1903,45 @@ if params.get("reload") == ["1"]:
     st.query_params.clear()
     st.rerun()
 
-# ── Panel de subida: solo la flechita azul, sin nada alrededor ──────────────
+# ── Panel de subida: solo ícono, sin ningún cuadro alrededor ────────────────
 st.markdown("""
 <style>
-/* ── Contenedor fijo ── */
+/* ── Posición fija ── */
 div[data-testid="stExpander"] {
-    position: fixed;
-    top: 6px;
-    right: 4px;
-    z-index: 9999;
-    width: auto;
-    min-width: 0;
+    position: fixed !important;
+    top: 6px !important;
+    right: 4px !important;
+    z-index: 9999 !important;
+    width: auto !important;
+    min-width: 0 !important;
     background: transparent !important;
     border: none !important;
     box-shadow: none !important;
+    border-radius: 0 !important;
+    padding: 0 !important;
 }
 
-/* ── Solo el emoji, sin nada alrededor ── */
+/* ── Matar borde en TODOS los wrappers internos ── */
+div[data-testid="stExpander"] *,
+div[data-testid="stExpander"] details,
+div[data-testid="stExpander"] details > summary,
+div[data-testid="stExpander"] > div,
+div[data-testid="stExpander"] > div > div,
+div[data-testid="stExpander"] > div > details {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    outline: none !important;
+}
+
+/* ── El summary (el botón visible) ── */
 div[data-testid="stExpander"] summary {
     display: inline-flex !important;
     align-items: center !important;
     padding: 0 !important;
     margin: 0 !important;
-    font-size: 1.15rem !important;
+    font-size: 1.2rem !important;
     background: transparent !important;
     border: none !important;
     box-shadow: none !important;
@@ -1935,15 +1951,14 @@ div[data-testid="stExpander"] summary {
     min-height: 0 !important;
     line-height: 1 !important;
     list-style: none !important;
-    -webkit-appearance: none !important;
-    appearance: none !important;
-    opacity: 0.75;
+    opacity: 0.7;
     transition: opacity .15s !important;
 }
-div[data-testid="stExpander"] summary:hover  { opacity: 1; }
-div[data-testid="stExpander"] summary:focus  { outline: none !important; box-shadow: none !important; }
-div[data-testid="stExpander"] summary::-webkit-details-marker { display: none; }
-div[data-testid="stExpander"] summary::marker { display: none; }
+div[data-testid="stExpander"] summary:hover  { opacity: 1 !important; background: transparent !important; border: none !important; }
+div[data-testid="stExpander"] summary:focus  { outline: none !important; box-shadow: none !important; background: transparent !important; border: none !important; }
+div[data-testid="stExpander"] summary:active { background: transparent !important; border: none !important; }
+div[data-testid="stExpander"] summary::-webkit-details-marker { display: none !important; }
+div[data-testid="stExpander"] summary::marker { display: none !important; }
 
 /* ── Ocultar flecha nativa de Streamlit ── */
 div[data-testid="stExpander"] summary svg,
@@ -1952,7 +1967,7 @@ div[data-testid="stExpander"] summary [data-testid="stExpanderToggleIcon"] {
 }
 
 /* ── Panel desplegable ── */
-div[data-testid="stExpander"] > div[data-testid="stExpanderDetails"] {
+div[data-testid="stExpander"] [data-testid="stExpanderDetails"] {
     position: absolute !important;
     right: 0 !important;
     top: calc(100% + 4px) !important;
@@ -1965,13 +1980,13 @@ div[data-testid="stExpander"] > div[data-testid="stExpanderDetails"] {
 }
 
 /* ── Texto interno ── */
-div[data-testid="stExpander"] > div[data-testid="stExpanderDetails"] p,
-div[data-testid="stExpander"] > div[data-testid="stExpanderDetails"] small {
+div[data-testid="stExpander"] [data-testid="stExpanderDetails"] p,
+div[data-testid="stExpander"] [data-testid="stExpanderDetails"] small {
     font-size: .7rem !important;
     color: #555 !important;
     margin: 0 0 6px 0 !important;
 }
-div[data-testid="stExpander"] > div[data-testid="stExpanderDetails"] strong {
+div[data-testid="stExpander"] [data-testid="stExpanderDetails"] strong {
     font-size: .72rem !important;
     color: #222 !important;
 }
