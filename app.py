@@ -2094,7 +2094,12 @@ with st.expander("⠀"):
             with st.spinner("Subiendo..."):
                 try:
                     msg = _subir_excel_sharepoint(archivo.read())
-                    st.success(msg)
+                    # ── Limpiar caché para forzar recarga con datos nuevos ──
+                    if _CACHE_LATEST.exists():
+                        _CACHE_LATEST.unlink()
+                    cargar_datos.clear()
+                    st.success(msg + " Recargando dashboard...")
+                    st.rerun()
                 except Exception as e:
                     st.error(f"❌ {e}")
 
