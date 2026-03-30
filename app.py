@@ -447,6 +447,58 @@ def cargar_datos(url: str = "") -> dict:
         pass
     return result_dict
 
+# ══════════════════════════════════════════════════════
+# DIAGNÓSTICO TEMPORAL — borrar después de encontrar la ruta
+# ══════════════════════════════════════════════════════
+def _diagnostico_sharepoint():
+    cfg = st.secrets["sharepoint"]
+    app_msal = msal.ConfidentialClientApplication(
+        cfg["client_id"],
+        authority=f"https://login.microsoftonline.com/{cfg['tenant_id']}",
+        client_credential=cfg["client_secret"],
+    )
+    token = app_msal.acquire_token_for_client(scopes=["https://graph.microsoft.com/.default"])
+    if "access_token" not in token:
+        st.error(f"Error auth: {token.get('error_description')}")
+        return
+    headers = {"Authorization": f"Bearer {token['access_token']}"}
+
+    # Obtener site_id
+    parts    = cfg["site_url"].rstrip("/").split("/")
+    hostname = parts[2]
+    site_path = "/".join(parts[3:])
+    site_resp = requests.get(
+        f"https://graph.microsoft.com/v1.0/sites/{hostname}:/{site_path}",
+        headers=headers, timeout=30
+    )
+    site_id = site_resp.json()["id"]
+    st.info(f"✅ Site ID: `{site_id}`")
+
+    # Listar bibliotecas
+    drives = requests.get(
+        f"https://graph.microsoft.com/v1.0/sites/{site_id}/drives",
+        headers=headers, timeout=30
+    ).json()
+    st.markdown("### Bibliotecas disponibles:")
+    for d in drives.get("value", []):
+        st.code(f"Nombre: {d['name']}\nID: {d['id']}")
+
+    # Listar raíz de cada biblioteca
+    for d in drives.get("value", []):
+        st.markdown(f"### Archivos en raíz de **{d['name']}**:")
+        items = requests.get(
+            f"https://graph.microsoft.com/v1.0/drives/{d['id']}/root/children",
+            headers=headers, timeout=30
+        ).json()
+        for item in items.get("value", []):
+            tipo = "📁" if "folder" in item else "📄"
+            st.write(f"{tipo} `{item['name']}`")
+
+if st.sidebar.button("🔍 Diagnóstico SharePoint"):
+    _diagnostico_sharepoint()
+    st.stop()
+# ══════════════════════════════════════════════════════
+
 try:
     DATA = cargar_datos()
 except Exception as e:
