@@ -1916,7 +1916,7 @@ section[data-testid="stMain"] > div:has(div[data-testid="stExpander"]) {
 div[data-testid="stExpander"] {
     position: fixed !important;
     top: 6px !important;
-    right: 18px !important;
+    right: 0px !important;
     left: auto !important;
     z-index: 99999 !important;
     width: auto !important;
