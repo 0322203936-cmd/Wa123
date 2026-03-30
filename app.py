@@ -1903,65 +1903,83 @@ if params.get("reload") == ["1"]:
     st.query_params.clear()
     st.rerun()
 
-# ── Panel de subida: expander simple que siempre funciona ────────────────────
-st.markdown("""
-<style>
-/* Anclar expander fijo arriba-derecha, visible pero pequeño */
-div[data-testid="stExpander"] {
-    position: fixed !important;
-    top: 6px !important;
-    right: 12px !important;
-    z-index: 99999 !important;
-    width: auto !important;
-    min-width: 0 !important;
-    background: rgba(255,255,255,0.85) !important;
-    border: none !important;
-    box-shadow: none !important;
-    transform: none !important;
-    margin: 0 !important;
-    padding: 0 !important;
-}
-div[data-testid="stExpander"] summary {
-    padding: 2px 6px !important;
-    font-size: .85rem !important;
-    color: #999 !important;
-    letter-spacing: 3px;
-    min-height: 0 !important;
-    background: transparent !important;
-    border: none !important;
-    box-shadow: none !important;
-    cursor: pointer;
-}
-div[data-testid="stExpander"] summary:hover { color: #444 !important; }
-div[data-testid="stExpander"] summary svg { display: none !important; }
-div[data-testid="stExpander"] > div[data-testid="stExpanderDetails"] {
-    padding: 10px 14px !important;
-    min-width: 320px !important;
-    right: 0 !important;
-    top: 24px !important;
-    position: absolute !important;
-    background: white !important;
-    border: 1px solid #ddd !important;
-    border-radius: 6px !important;
-    box-shadow: 0 4px 16px rgba(0,0,0,.15) !important;
-}
-</style>
-""", unsafe_allow_html=True)
+# ── Botón flotante fijo (tuerquita) + panel de subida aparte ─────────────────
+# La tuerquita vive en un components.html independiente — nunca se mueve con el scroll.
+# Al hacer clic setea ?gear=1 en la URL y Streamlit muestra el panel encima del dashboard.
 
-with st.expander("⋯"):
-    st.markdown("**📤 Actualizar datos en SharePoint**")
-    st.caption("Los datos desde la fila 26 (cols A→AS) reemplazarán la hoja `Data` desde fila 1.")
-    archivo = st.file_uploader("Selecciona tu Excel (.xlsx / .xls)", type=["xlsx","xlsm","xls"], key="up_sp", label_visibility="collapsed")
-    if st.button("⬆️ Subir a SharePoint", type="primary", use_container_width=True):
-        if archivo is None:
-            st.warning("Primero selecciona un archivo.")
-        else:
-            with st.spinner("Subiendo..."):
-                try:
-                    msg = _subir_excel_sharepoint(archivo.read())
-                    st.success(msg)
-                except Exception as e:
-                    st.error(f"❌ {e}")
+if "show_upload" not in st.session_state:
+    st.session_state["show_upload"] = False
+
+# Detectar clic desde query param
+if st.query_params.get("gear") == "1":
+    st.session_state["show_upload"] = True
+    st.query_params.clear()
+    st.rerun()
+
+# Tuerquita fija — components.html propio, no se mueve con el scroll
+components.html("""
+<style>
+  body { margin:0; background:transparent; overflow:hidden; }
+  #gear {
+    position: fixed;
+    top: 8px;
+    right: 12px;
+    width: 26px;
+    height: 26px;
+    cursor: pointer;
+    opacity: 0.35;
+    transition: opacity .2s, transform .3s;
+    z-index: 99999;
+  }
+  #gear:hover { opacity: 0.75; transform: rotate(45deg); }
+</style>
+<svg id="gear" viewBox="0 0 24 24" fill="none" stroke="#333" stroke-width="2"
+     stroke-linecap="round" stroke-linejoin="round"
+     onclick="openPanel()"
+     xmlns="http://www.w3.org/2000/svg">
+  <circle cx="12" cy="12" r="3"/>
+  <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06
+           a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09
+           A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83
+           l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09
+           A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83
+           l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09
+           a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83
+           l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09
+           a1.65 1.65 0 0 0-1.51 1z"/>
+</svg>
+<script>
+function openPanel(){
+  var url = window.parent.location.href.split('?')[0] + '?gear=1';
+  window.parent.location.href = url;
+}
+</script>
+""", height=40, scrolling=False)
+
+# Panel de subida — aparece solo cuando se activa
+if st.session_state.get("show_upload"):
+    with st.container():
+        st.markdown("---")
+        st.markdown("**📤 Actualizar datos en SharePoint**")
+        st.caption("Los datos desde la fila 26 (cols A→AS) reemplazarán la hoja `Data` desde fila 1.")
+        archivo = st.file_uploader("Selecciona tu Excel (.xlsx / .xls)", type=["xlsx","xlsm","xls"], key="up_sp", label_visibility="collapsed")
+        col1, col2 = st.columns([3,1])
+        with col1:
+            if st.button("⬆️ Subir a SharePoint", type="primary", use_container_width=True):
+                if archivo is None:
+                    st.warning("Primero selecciona un archivo.")
+                else:
+                    with st.spinner("Subiendo..."):
+                        try:
+                            msg = _subir_excel_sharepoint(archivo.read())
+                            st.success(msg)
+                        except Exception as e:
+                            st.error(f"❌ {e}")
+        with col2:
+            if st.button("✕ Cerrar", use_container_width=True):
+                st.session_state["show_upload"] = False
+                st.rerun()
+        st.markdown("---")
 
 # ── Render del dashboard ──────────────────────────────────────────────────────
 html_content = build_html()
