@@ -73,8 +73,16 @@ def _descargar_excel_sharepoint() -> tuple:
 
 
 def _subir_excel_sharepoint(archivo_local_bytes: bytes) -> str:
-    import io
+    """
+    Escribe directamente en el Excel de SharePoint usando la API de Excel de
+    Microsoft Graph — funciona aunque el archivo esté abierto, y actualiza
+    el rango completo de un solo request (sin descargar ni subir el archivo).
+    """
+    import io, math
+    import pandas as pd
     cfg = st.secrets["sharepoint"]
+
+    # ── Autenticación MSAL ──
     app_msal = msal.ConfidentialClientApplication(
         cfg["client_id"],
         authority=f"https://login.microsoftonline.com/{cfg['tenant_id']}",
@@ -83,64 +91,119 @@ def _subir_excel_sharepoint(archivo_local_bytes: bytes) -> str:
     token = app_msal.acquire_token_for_client(scopes=["https://graph.microsoft.com/.default"])
     if "access_token" not in token:
         raise RuntimeError(f"Error auth: {token.get('error_description', token)}")
-    hdrs = {"Authorization": f"Bearer {token['access_token']}"}
+    hdrs = {"Authorization": f"Bearer {token['access_token']}", "Content-Type": "application/json"}
 
-    parts    = cfg["site_url"].rstrip("/").split("/")
-    r        = requests.get(
-        f"https://graph.microsoft.com/v1.0/sites/{parts[2]}:/{'/'.join(parts[3:])}",
+    # ── Site ID ──
+    parts = cfg["site_url"].rstrip("/").split("/")
+    r = requests.get(
+        f"https://graph.microsoft.com/v1.0/sites/{parts[2]}:/{chr(47).join(parts[3:])}",
         headers=hdrs, timeout=30)
     r.raise_for_status()
-    site_id  = r.json()["id"]
-    base_url = f"https://graph.microsoft.com/v1.0/sites/{site_id}/drive/root:{cfg['file_path']}"
+    site_id = r.json()["id"]
 
-    sp_resp = requests.get(f"{base_url}:/content", headers=hdrs, timeout=60)
-    sp_resp.raise_for_status()
-    tmp_sp = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
-    tmp_sp.write(sp_resp.content)
-    tmp_sp.close()
+    # ── Item ID del archivo ──
+    file_path_encoded = cfg["file_path"].lstrip("/")
+    item_resp = requests.get(
+        f"https://graph.microsoft.com/v1.0/sites/{site_id}/drive/root:/{file_path_encoded}",
+        headers=hdrs, timeout=30)
+    item_resp.raise_for_status()
+    item_id = item_resp.json()["id"]
 
-    import pandas as pd
-    COL_INI, COL_FIN, FILA_LOCAL = 1, 45, 26
-    filas = []
-    # Intentar openpyxl (xlsx) primero, luego fallback para .xls
+    base = f"https://graph.microsoft.com/v1.0/sites/{site_id}/drive/items/{item_id}/workbook"
+
+    # ── Crear sesión de Excel (persistente para múltiples writes) ──
+    sess_resp = requests.post(
+        f"{base}/createSession",
+        headers=hdrs,
+        json={"persistChanges": True},
+        timeout=30)
+    sess_resp.raise_for_status()
+    session_id = sess_resp.json()["id"]
+    hdrs_sess = {**hdrs, "workbook-session-id": session_id}
+
     try:
-        wb_local = openpyxl.load_workbook(io.BytesIO(archivo_local_bytes), data_only=True)
-        ws_local = wb_local.active
-        for row in ws_local.iter_rows(min_row=FILA_LOCAL, min_col=COL_INI, max_col=COL_FIN, values_only=True):
-            if all(v is None for v in row):
-                break
-            filas.append(tuple(row))
-    except Exception:
-        for engine in ("openpyxl", "xlrd"):
-            try:
-                df = pd.read_excel(io.BytesIO(archivo_local_bytes), engine=engine, header=None)
-                df = df.iloc[FILA_LOCAL - 1:, COL_INI - 1:COL_FIN].dropna(how="all")
-                filas = [tuple(r) for r in df.values.tolist()]
-                break
-            except Exception:
-                continue
-    if not filas:
-        return "⚠️ No se encontraron datos desde la fila 26."
+        # ── Leer Excel local desde fila 26, cols A(1)→AS(45) ──
+        COL_INI, COL_FIN, FILA_LOCAL = 1, 45, 26
+        filas = []
+        try:
+            wb_local = openpyxl.load_workbook(io.BytesIO(archivo_local_bytes), data_only=True)
+            ws_local = wb_local.active
+            for row in ws_local.iter_rows(min_row=FILA_LOCAL, min_col=COL_INI, max_col=COL_FIN, values_only=True):
+                if all(v is None for v in row):
+                    break
+                filas.append(list(row))
+        except Exception:
+            for engine in ("openpyxl", "xlrd"):
+                try:
+                    df = pd.read_excel(io.BytesIO(archivo_local_bytes), engine=engine, header=None)
+                    df = df.iloc[FILA_LOCAL - 1:, COL_INI - 1:COL_FIN].dropna(how="all")
+                    filas = [list(r) for r in df.values.tolist()]
+                    break
+                except Exception:
+                    continue
 
-    wb_sp = openpyxl.load_workbook(tmp_sp.name)
-    ws_sp = wb_sp['Data']
-    for row in ws_sp.iter_rows(min_row=1, min_col=COL_INI, max_col=COL_FIN):
-        for cell in row:
-            cell.value = None
-    for r_idx, fila in enumerate(filas, start=1):
-        for c_idx, valor in enumerate(fila, start=COL_INI):
-            ws_sp.cell(row=r_idx, column=c_idx, value=valor)
+        if not filas:
+            return "⚠️ No se encontraron datos desde la fila 26."
 
-    output = io.BytesIO()
-    wb_sp.save(output)
-    output.seek(0)
-    up = requests.put(f"{base_url}:/content", data=output.read(), timeout=120, headers={
-        **hdrs,
-        "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    })
-    up.raise_for_status()
-    Path(tmp_sp.name).unlink(missing_ok=True)
-    return f"✅ ¡Listo! {len(filas)} filas actualizadas en SharePoint (hoja 'Data', cols A→AS)."
+        n_filas = len(filas)
+        n_cols  = COL_FIN - COL_INI + 1  # 45
+
+        # ── Convertir valores no serializables (datetime, None→"") ──
+        def clean(v):
+            if v is None:
+                return ""
+            if hasattr(v, "isoformat"):
+                return v.isoformat()
+            return v
+
+        filas_clean = [[clean(v) for v in fila] for fila in filas]
+
+        # Columna AS en notación A1
+        def col_letter(n):
+            s = ""
+            while n > 0:
+                n, r = divmod(n - 1, 26)
+                s = chr(65 + r) + s
+            return s
+
+        ultima_col = col_letter(COL_FIN)  # "AS"
+
+        # ── PASO 1: Limpiar rango completo de un solo golpe ──
+        # Averiguar cuántas filas tiene la hoja Data actualmente
+        used_resp = requests.get(
+            f"{base}/worksheets/Data/usedRange",
+            headers=hdrs_sess, timeout=30)
+        if used_resp.ok:
+            used_data = used_resp.json()
+            total_filas_sp = used_data.get("rowCount", 10000)
+        else:
+            total_filas_sp = 10000
+
+        # Construir matriz de vacíos del tamaño exacto del rango usado
+        vacios = [[""] * n_cols for _ in range(total_filas_sp)]
+        clear_range = f"Data!A1:{ultima_col}{total_filas_sp}"
+
+        clear_resp = requests.patch(
+            f"{base}/worksheets/Data/range(address='{clear_range}')",
+            headers=hdrs_sess,
+            json={"values": vacios},
+            timeout=120)
+        clear_resp.raise_for_status()
+
+        # ── PASO 2: Escribir nuevos datos de un solo golpe ──
+        write_range = f"Data!A1:{ultima_col}{n_filas}"
+        write_resp = requests.patch(
+            f"{base}/worksheets/Data/range(address='{write_range}')",
+            headers=hdrs_sess,
+            json={"values": filas_clean},
+            timeout=120)
+        write_resp.raise_for_status()
+
+    finally:
+        # ── Cerrar sesión siempre ──
+        requests.post(f"{base}/closeSession", headers=hdrs_sess, timeout=15)
+
+    return f"✅ ¡Listo! {n_filas} filas escritas en SharePoint (hoja Data, A→AS) en un solo request."
 
 
 st.set_page_config(page_title="Walmex · CFBC", layout="wide", initial_sidebar_state="collapsed")
