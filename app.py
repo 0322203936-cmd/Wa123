@@ -1990,25 +1990,95 @@ div[data-testid="stExpander"] [data-testid="stExpanderDetails"] {
     box-shadow: 0 4px 18px rgba(0,0,0,.13) !important;
 }
 
+/* ── Panel desplegable — rediseño profesional ── */
+div[data-testid="stExpander"] [data-testid="stExpanderDetails"] {
+    position: absolute !important;
+    right: 0 !important;
+    top: calc(100% + 6px) !important;
+    min-width: 320px !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    border: 1px solid #e0e6ef !important;
+    border-radius: 10px !important;
+    box-shadow: 0 8px 32px rgba(0,60,140,.13), 0 1.5px 6px rgba(0,0,0,.07) !important;
+    overflow: hidden !important;
+}
+
+/* ── Cabecera azul del panel ── */
+div[data-testid="stExpander"] [data-testid="stExpanderDetails"]::before {
+    content: "Actualizar datos en SharePoint" !important;
+    display: block !important;
+    background: linear-gradient(90deg,#0071ce,#004f9a) !important;
+    color: #fff !important;
+    font-size: .78rem !important;
+    font-weight: 700 !important;
+    letter-spacing: .03em !important;
+    padding: 10px 16px !important;
+    font-family: Arial, sans-serif !important;
+}
+
+/* ── Contenido interno con padding ── */
+div[data-testid="stExpander"] [data-testid="stExpanderDetails"] > div {
+    padding: 14px 16px 12px !important;
+}
+
 /* ── Texto interno ── */
-div[data-testid="stExpander"] [data-testid="stExpanderDetails"] p,
-div[data-testid="stExpander"] [data-testid="stExpanderDetails"] small {
-    font-size: .7rem !important;
+div[data-testid="stExpander"] [data-testid="stExpanderDetails"] p {
+    font-size: .72rem !important;
     color: #555 !important;
-    margin: 0 0 6px 0 !important;
+    margin: 0 0 8px 0 !important;
+    font-family: Arial, sans-serif !important;
+}
+div[data-testid="stExpander"] [data-testid="stExpanderDetails"] small {
+    font-size: .67rem !important;
+    color: #888 !important;
 }
 div[data-testid="stExpander"] [data-testid="stExpanderDetails"] strong {
+    font-size: .75rem !important;
+    color: #111 !important;
+}
+
+/* ── File uploader limpio ── */
+div[data-testid="stExpander"] [data-testid="stFileUploader"] {
+    border: 1.5px dashed #b0c4de !important;
+    border-radius: 7px !important;
+    background: #f5f8ff !important;
+    padding: 4px !important;
+    transition: border-color .2s !important;
+}
+div[data-testid="stExpander"] [data-testid="stFileUploader"]:hover {
+    border-color: #0071ce !important;
+}
+div[data-testid="stExpander"] [data-testid="stFileUploader"] span {
     font-size: .72rem !important;
-    color: #222 !important;
+    color: #444 !important;
+}
+
+/* ── Botón Subir ── */
+div[data-testid="stExpander"] .stButton button {
+    background: linear-gradient(90deg,#0071ce,#004f9a) !important;
+    color: #fff !important;
+    border: none !important;
+    border-radius: 6px !important;
+    font-size: .74rem !important;
+    font-weight: 700 !important;
+    letter-spacing: .04em !important;
+    padding: 7px 0 !important;
+    width: 100% !important;
+    cursor: pointer !important;
+    transition: opacity .15s !important;
+    margin-top: 6px !important;
+}
+div[data-testid="stExpander"] .stButton button:hover {
+    opacity: .88 !important;
 }
 </style>
 """, unsafe_allow_html=True)
 
 with st.expander("⠀"):
-    st.markdown("**📤 Subir Excel a SharePoint**")
-    st.caption("Fila 26 · cols A→AS → hoja Data")
+    st.caption("📁 Fila 26 · cols A → AS · hoja **Data**")
     archivo = st.file_uploader("Excel", type=["xlsx","xlsm","xls"], key="up_sp", label_visibility="collapsed")
-    if st.button("⬆️ Subir", type="primary", use_container_width=True):
+    if st.button("⬆ Subir a SharePoint", type="primary", use_container_width=True):
         if archivo is None:
             st.warning("Selecciona un archivo primero.")
         else:
