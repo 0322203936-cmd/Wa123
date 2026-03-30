@@ -1906,22 +1906,25 @@ if params.get("reload") == ["1"]:
 # ── Panel de subida: expander simple que siempre funciona ────────────────────
 st.markdown("""
 <style>
-/* Expander minimalista — solo 3 puntitos, arriba a la derecha, sin caja */
+/* Anclar expander fijo arriba-derecha, visible pero pequeño */
 div[data-testid="stExpander"] {
-    position: fixed;
-    top: 6px;
-    right: 12px;
-    z-index: 9999;
-    width: auto;
-    min-width: 0;
-    background: transparent;
+    position: fixed !important;
+    top: 6px !important;
+    right: 12px !important;
+    z-index: 99999 !important;
+    width: auto !important;
+    min-width: 0 !important;
+    background: rgba(255,255,255,0.85) !important;
     border: none !important;
     box-shadow: none !important;
+    transform: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
 }
 div[data-testid="stExpander"] summary {
     padding: 2px 6px !important;
     font-size: .85rem !important;
-    color: #aaa !important;
+    color: #999 !important;
     letter-spacing: 3px;
     min-height: 0 !important;
     background: transparent !important;
@@ -1929,18 +1932,18 @@ div[data-testid="stExpander"] summary {
     box-shadow: none !important;
     cursor: pointer;
 }
-div[data-testid="stExpander"] summary:hover { color: #555 !important; }
+div[data-testid="stExpander"] summary:hover { color: #444 !important; }
 div[data-testid="stExpander"] summary svg { display: none !important; }
 div[data-testid="stExpander"] > div[data-testid="stExpanderDetails"] {
     padding: 10px 14px !important;
-    min-width: 320px;
-    right: 0;
-    top: 24px;
-    position: absolute;
-    background: white;
-    border: 1px solid #ddd;
-    border-radius: 6px;
-    box-shadow: 0 4px 16px rgba(0,0,0,.15);
+    min-width: 320px !important;
+    right: 0 !important;
+    top: 24px !important;
+    position: absolute !important;
+    background: white !important;
+    border: 1px solid #ddd !important;
+    border-radius: 6px !important;
+    box-shadow: 0 4px 16px rgba(0,0,0,.15) !important;
 }
 </style>
 """, unsafe_allow_html=True)
