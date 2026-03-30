@@ -1903,78 +1903,70 @@ if params.get("reload") == ["1"]:
     st.query_params.clear()
     st.rerun()
 
-# ── Panel de subida: botón ··· discreto, junto al botón ↺ ───────────────────
+# ── Panel de subida: botón ··· mínimo fijo junto al ↺ ───────────────────────
 st.markdown("""
 <style>
-/* ── Contenedor fijo del expander ── */
+/* Contenedor — fijo, sin borde ni fondo propio */
 div[data-testid="stExpander"] {
-    position: fixed;
-    top: 7px;
-    right: 52px;          /* justo a la izquierda del botón ↺ */
-    z-index: 9999;
-    width: auto;
-    min-width: 0;
-    background: transparent;
+    position: fixed !important;
+    top: 8px !important;
+    right: 50px !important;
+    z-index: 9999 !important;
+    width: fit-content !important;
+    min-width: 0 !important;
+    background: transparent !important;
     border: none !important;
     box-shadow: none !important;
-    border-radius: 4px;
+    padding: 0 !important;
+    margin: 0 !important;
 }
-
-/* ── El botón ··· — idéntico al estilo btn-reload del dashboard ── */
+/* Botón ··· — solo tres puntos, tamaño mínimo */
 div[data-testid="stExpander"] summary {
     display: inline-flex !important;
     align-items: center !important;
-    padding: 4px 8px !important;
-    font-size: .65rem !important;
+    justify-content: center !important;
+    width: 24px !important;
+    height: 24px !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    font-size: .6rem !important;
     font-weight: 400 !important;
-    color: #888 !important;
-    background: #fff !important;
-    border: 1px solid #ccc !important;
+    color: #aaa !important;
+    background: transparent !important;
+    border: none !important;
     border-radius: 4px !important;
     cursor: pointer !important;
-    letter-spacing: 2px;
-    min-height: 0 !important;
+    letter-spacing: 1.5px !important;
     line-height: 1 !important;
-    transition: border-color .15s, color .15s !important;
     list-style: none !important;
+    transition: color .15s !important;
 }
 div[data-testid="stExpander"] summary::-webkit-details-marker { display: none; }
 div[data-testid="stExpander"] summary::marker { display: none; }
-div[data-testid="stExpander"] summary:hover {
-    border-color: #0071ce !important;
-    color: #0071ce !important;
-}
-
-/* ── Ocultar la flecha nativa de Streamlit ── */
+div[data-testid="stExpander"] summary:hover { color: #0071ce !important; }
+/* Ocultar flecha de Streamlit */
 div[data-testid="stExpander"] summary svg,
 div[data-testid="stExpander"] summary [data-testid="stExpanderToggleIcon"] {
     display: none !important;
 }
-
-/* ── Panel desplegable — aparece abajo a la derecha ── */
+/* Panel desplegable — compacto, alineado a la derecha */
 div[data-testid="stExpander"] > div[data-testid="stExpanderDetails"] {
     position: absolute !important;
     right: 0 !important;
-    top: calc(100% + 4px) !important;
-    min-width: 280px !important;
-    padding: 12px 14px !important;
+    top: 28px !important;
+    width: 240px !important;
+    padding: 10px 12px !important;
     background: #fff !important;
     border: 1px solid #ddd !important;
     border-radius: 6px !important;
-    box-shadow: 0 4px 18px rgba(0,0,0,.13) !important;
+    box-shadow: 0 4px 14px rgba(0,0,0,.12) !important;
 }
-
-/* ── Texto interno compacto ── */
-div[data-testid="stExpander"] > div[data-testid="stExpanderDetails"] p,
-div[data-testid="stExpander"] > div[data-testid="stExpanderDetails"] small {
+/* Reducir tamaño de todo el contenido interno */
+div[data-testid="stExpander"] > div[data-testid="stExpanderDetails"] * {
     font-size: .7rem !important;
-    color: #555 !important;
-    margin: 0 0 6px 0 !important;
 }
-div[data-testid="stExpander"] > div[data-testid="stExpanderDetails"] strong {
-    font-size: .72rem !important;
-    color: #222 !important;
-}
+div[data-testid="stExpander"] > div[data-testid="stExpanderDetails"] p { margin: 0 0 4px !important; }
+div[data-testid="stExpander"] > div[data-testid="stExpanderDetails"] small { color: #777 !important; }
 </style>
 """, unsafe_allow_html=True)
 
