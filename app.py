@@ -1747,10 +1747,18 @@ function recargarDatos(){
 }
 
 function abrirPanel(){
+  // Envía mensaje al iframe listener de Streamlit (mismo origen)
   try{
-    var base = window.parent.location.href.split('?')[0];
-    window.parent.location.href = base + '?gear=1';
-  }catch(e){}
+    // Busca todos los iframes del padre y manda el mensaje
+    var frames = window.parent.document.querySelectorAll('iframe');
+    frames.forEach(function(f){
+      try{ f.contentWindow.postMessage('OPEN_UPLOAD','*'); }catch(ex){}
+    });
+    // También intenta navegación directa como fallback
+    window.parent.location.search = '?gear=1';
+  }catch(e){
+    try{ window.parent.location.search = '?gear=1'; }catch(ex){}
+  }
 }
 
 function imprimirReporte(){
@@ -1918,18 +1926,27 @@ if params.get("reload") == ["1"]:
     st.query_params.clear()
     st.rerun()
 
-# ── Botón flotante fijo (tuerquita) + panel de subida aparte ─────────────────
-# La tuerquita vive en un components.html independiente — nunca se mueve con el scroll.
-# Al hacer clic setea ?gear=1 en la URL y Streamlit muestra el panel encima del dashboard.
-
+# ── Panel de subida activado por la tuerquita ────────────────────────────────
 if "show_upload" not in st.session_state:
     st.session_state["show_upload"] = False
 
-# Detectar clic desde query param (viene del botón ⚙ dentro del dashboard HTML)
+# Detectar ?gear=1 (fallback por si postMessage no funciona)
 if st.query_params.get("gear") == "1":
     st.session_state["show_upload"] = True
     st.query_params.clear()
     st.rerun()
+
+# Listener postMessage: recibe "OPEN_UPLOAD" desde el iframe del dashboard
+components.html("""
+<script>
+window.addEventListener('message', function(e){
+    if(e.data === 'OPEN_UPLOAD'){
+        try { window.parent.location.search = '?gear=1'; }
+        catch(err) { window.location.search = '?gear=1'; }
+    }
+}, false);
+</script>
+""", height=0, scrolling=False)
 
 # Panel de subida — aparece arriba cuando se activa desde la tuerca
 if st.session_state.get("show_upload"):
