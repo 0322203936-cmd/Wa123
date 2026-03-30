@@ -527,6 +527,13 @@ body{background:#fff;font-family:Arial,sans-serif;font-size:12px;color:#111}
   cursor:pointer;transition:.15s;white-space:nowrap;flex-shrink:0;
 }
 .btn-print:hover{background:#0071ce;color:#fff}
+.btn-reload{
+  display:inline-flex;align-items:center;gap:4px;
+  padding:4px 8px;border-radius:4px;border:1px solid #ccc;
+  background:#fff;color:#888;font-size:.65rem;
+  cursor:pointer;transition:.15s;white-space:nowrap;flex-shrink:0;
+}
+.btn-reload:hover{border-color:#0071ce;color:#0071ce}
 .ctrl{display:flex;align-items:center;gap:8px;padding:5px 16px;background:#f5f7fa;border-bottom:1px solid #ddd;flex-wrap:wrap}
 .ctrl label{font-size:.7rem;color:#555;font-weight:600}
 select{border:1px solid #bbb;border-radius:4px;padding:3px 7px;font-size:.72rem;cursor:pointer;background:#fff}
@@ -601,6 +608,7 @@ html,body{height:auto;overflow-y:auto}
         <div>Semana&nbsp;&nbsp;<strong id="hdrSem">—</strong></div>
       </div>
       <button class="btn-print" onclick="imprimirReporte()">🖨️ Imprimir</button>
+      <button class="btn-reload" onclick="recargarDatos()" title="Actualizar datos">↺</button>
     </div>
   </div>
   <div class="hdr-tienda">Nombre de Tienda&nbsp;&nbsp;<strong id="hdrTienda">—</strong></div>
@@ -1562,6 +1570,19 @@ function limpiarInvFiltro(){
 // onafterprint cierra la pestaña para que no quede about:blank.
 // No hay footer con fecha — la fecha solo está en el encabezado.
 // ────────────────────────────────────────────────────────────────────────────
+function recargarDatos(){
+  try{
+    var url = window.parent.location.href;
+    if(url.indexOf('reload=1') === -1){
+      window.parent.location.href = url + (url.indexOf('?') === -1 ? '?' : '&') + 'reload=1';
+    } else {
+      window.parent.location.reload(true);
+    }
+  }catch(e){
+    window.location.reload(true);
+  }
+}
+
 function imprimirReporte(){
   var tienda  = document.getElementById('hdrTienda').textContent;
   var semana  = document.getElementById('hdrSem').textContent;
@@ -1717,6 +1738,13 @@ def build_html():
         json.dumps(DATA, ensure_ascii=True, default=str).encode('utf-8')
     ).decode('ascii')
     return HTML.replace('__DATA_JSON__', data_json)
+
+# Verificar si se pidió recarga vía query params
+params = st.query_params
+if params.get("reload") == ["1"]:
+    cargar_datos.clear()
+    st.query_params.clear()
+    st.rerun()
 
 # Caché del HTML: construir directamente (cache ya manejado por @st.cache_data)
 html_content = build_html()
