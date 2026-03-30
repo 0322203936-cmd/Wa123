@@ -1906,11 +1906,11 @@ if params.get("reload") == ["1"]:
 # ── Panel de subida: expander simple que siempre funciona ────────────────────
 st.markdown("""
 <style>
-/* Expander invisible — solo 3 puntitos discretos */
+/* Expander minimalista — solo 3 puntitos, arriba a la derecha, sin caja */
 div[data-testid="stExpander"] {
     position: fixed;
-    bottom: 10px;
-    right: 14px;
+    top: 6px;
+    right: 12px;
     z-index: 9999;
     width: auto;
     min-width: 0;
@@ -1920,23 +1920,22 @@ div[data-testid="stExpander"] {
 }
 div[data-testid="stExpander"] summary {
     padding: 2px 6px !important;
-    font-size: .8rem !important;
-    color: #bbb !important;
+    font-size: .85rem !important;
+    color: #aaa !important;
     letter-spacing: 3px;
     min-height: 0 !important;
     background: transparent !important;
     border: none !important;
     box-shadow: none !important;
-    list-style: none;
+    cursor: pointer;
 }
-div[data-testid="stExpander"] summary:hover { color: #666 !important; }
-/* Ocultar flecha nativa del expander */
+div[data-testid="stExpander"] summary:hover { color: #555 !important; }
 div[data-testid="stExpander"] summary svg { display: none !important; }
 div[data-testid="stExpander"] > div[data-testid="stExpanderDetails"] {
     padding: 10px 14px !important;
     min-width: 320px;
     right: 0;
-    bottom: 24px;
+    top: 24px;
     position: absolute;
     background: white;
     border: 1px solid #ddd;
