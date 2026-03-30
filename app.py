@@ -1910,51 +1910,46 @@ if params.get("reload") == ["1"]:
 if "show_upload" not in st.session_state:
     st.session_state["show_upload"] = False
 
-# Detectar clic desde query param
-if st.query_params.get("gear") == "1":
-    st.session_state["show_upload"] = True
-    st.query_params.clear()
-    st.rerun()
-
-# Tuerquita fija — components.html propio, no se mueve con el scroll
-components.html("""
+# CSS: tuerquita pequeña fija arriba-derecha usando un botón nativo de Streamlit
+st.markdown("""
 <style>
-  body { margin:0; background:transparent; overflow:hidden; }
-  #gear {
-    position: fixed;
-    top: 8px;
-    right: 12px;
-    width: 26px;
-    height: 26px;
-    cursor: pointer;
-    opacity: 0.35;
-    transition: opacity .2s, transform .3s;
-    z-index: 99999;
-  }
-  #gear:hover { opacity: 0.75; transform: rotate(45deg); }
-</style>
-<svg id="gear" viewBox="0 0 24 24" fill="none" stroke="#333" stroke-width="2"
-     stroke-linecap="round" stroke-linejoin="round"
-     onclick="openPanel()"
-     xmlns="http://www.w3.org/2000/svg">
-  <circle cx="12" cy="12" r="3"/>
-  <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06
-           a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09
-           A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83
-           l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09
-           A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83
-           l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09
-           a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83
-           l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09
-           a1.65 1.65 0 0 0-1.51 1z"/>
-</svg>
-<script>
-function openPanel(){
-  var url = window.parent.location.href.split('?')[0] + '?gear=1';
-  window.parent.location.href = url;
+div[data-testid="stButton"][id="gear_wrap"] > button,
+button[key="gear_btn"] {
+    position: fixed !important;
+    top: 6px !important;
+    right: 10px !important;
+    z-index: 99999 !important;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    color: #bbb !important;
+    font-size: 13px !important;
+    padding: 2px 4px !important;
+    min-height: 0 !important;
+    line-height: 1 !important;
+    width: auto !important;
 }
-</script>
-""", height=40, scrolling=False)
+button[key="gear_btn"]:hover { color: #555 !important; }
+/* Apuntar al botón por posición en el DOM — último botón pequeño fijo */
+section.main > div > div > div > div:last-child button {
+    position: fixed !important;
+    top: 6px !important;
+    right: 10px !important;
+    z-index: 99999 !important;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    color: #bbb !important;
+    font-size: 13px !important;
+    padding: 2px 4px !important;
+    min-height: 0 !important;
+}
+</style>
+""", unsafe_allow_html=True)
+
+if st.button("⚙", key="gear_btn", help="Actualizar datos"):
+    st.session_state["show_upload"] = not st.session_state["show_upload"]
+    st.rerun()
 
 # Panel de subida — aparece solo cuando se activa
 if st.session_state.get("show_upload"):
