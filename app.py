@@ -1903,50 +1903,88 @@ if params.get("reload") == ["1"]:
     st.query_params.clear()
     st.rerun()
 
-# ── Panel de subida: expander simple que siempre funciona ────────────────────
+# ── Panel de subida: botón ··· discreto, junto al botón ↺ ───────────────────
 st.markdown("""
 <style>
-/* Hacer el expander pequeño y discreto, alineado arriba */
+/* ── Contenedor fijo del expander ── */
 div[data-testid="stExpander"] {
     position: fixed;
-    top: 4px;
-    right: 10px;
+    top: 7px;
+    right: 52px;          /* justo a la izquierda del botón ↺ */
     z-index: 9999;
     width: auto;
     min-width: 0;
-    background: white;
-    border: 1px solid #ddd !important;
-    border-radius: 6px;
-    box-shadow: 0 2px 8px rgba(0,0,0,.12);
+    background: transparent;
+    border: none !important;
+    box-shadow: none !important;
+    border-radius: 4px;
 }
+
+/* ── El botón ··· — idéntico al estilo btn-reload del dashboard ── */
 div[data-testid="stExpander"] summary {
-    padding: 3px 10px !important;
-    font-size: .72rem !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    padding: 4px 8px !important;
+    font-size: .65rem !important;
+    font-weight: 400 !important;
     color: #888 !important;
+    background: #fff !important;
+    border: 1px solid #ccc !important;
+    border-radius: 4px !important;
+    cursor: pointer !important;
     letter-spacing: 2px;
     min-height: 0 !important;
+    line-height: 1 !important;
+    transition: border-color .15s, color .15s !important;
+    list-style: none !important;
 }
-div[data-testid="stExpander"] summary:hover { color: #333 !important; }
+div[data-testid="stExpander"] summary::-webkit-details-marker { display: none; }
+div[data-testid="stExpander"] summary::marker { display: none; }
+div[data-testid="stExpander"] summary:hover {
+    border-color: #0071ce !important;
+    color: #0071ce !important;
+}
+
+/* ── Ocultar la flecha nativa de Streamlit ── */
+div[data-testid="stExpander"] summary svg,
+div[data-testid="stExpander"] summary [data-testid="stExpanderToggleIcon"] {
+    display: none !important;
+}
+
+/* ── Panel desplegable — aparece abajo a la derecha ── */
 div[data-testid="stExpander"] > div[data-testid="stExpanderDetails"] {
-    padding: 10px 14px !important;
-    min-width: 320px;
-    right: 0;
-    position: absolute;
-    background: white;
-    border: 1px solid #ddd;
-    border-radius: 6px;
-    box-shadow: 0 4px 16px rgba(0,0,0,.15);
+    position: absolute !important;
+    right: 0 !important;
+    top: calc(100% + 4px) !important;
+    min-width: 280px !important;
+    padding: 12px 14px !important;
+    background: #fff !important;
+    border: 1px solid #ddd !important;
+    border-radius: 6px !important;
+    box-shadow: 0 4px 18px rgba(0,0,0,.13) !important;
+}
+
+/* ── Texto interno compacto ── */
+div[data-testid="stExpander"] > div[data-testid="stExpanderDetails"] p,
+div[data-testid="stExpander"] > div[data-testid="stExpanderDetails"] small {
+    font-size: .7rem !important;
+    color: #555 !important;
+    margin: 0 0 6px 0 !important;
+}
+div[data-testid="stExpander"] > div[data-testid="stExpanderDetails"] strong {
+    font-size: .72rem !important;
+    color: #222 !important;
 }
 </style>
 """, unsafe_allow_html=True)
 
-with st.expander("⋯"):
-    st.markdown("**📤 Actualizar datos en SharePoint**")
-    st.caption("Los datos desde la fila 26 (cols A→AS) reemplazarán la hoja `Data` desde fila 1.")
-    archivo = st.file_uploader("Selecciona tu Excel (.xlsx / .xls)", type=["xlsx","xlsm","xls"], key="up_sp", label_visibility="collapsed")
-    if st.button("⬆️ Subir a SharePoint", type="primary", use_container_width=True):
+with st.expander("···"):
+    st.markdown("**📤 Subir Excel a SharePoint**")
+    st.caption("Fila 26 · cols A→AS → hoja Data")
+    archivo = st.file_uploader("Excel", type=["xlsx","xlsm","xls"], key="up_sp", label_visibility="collapsed")
+    if st.button("⬆️ Subir", type="primary", use_container_width=True):
         if archivo is None:
-            st.warning("Primero selecciona un archivo.")
+            st.warning("Selecciona un archivo primero.")
         else:
             with st.spinner("Subiendo..."):
                 try:
