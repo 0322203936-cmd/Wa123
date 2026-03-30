@@ -1960,25 +1960,21 @@ div[data-testid="stExpander"] summary:active { background: transparent !importan
 div[data-testid="stExpander"] summary::-webkit-details-marker { display: none !important; }
 div[data-testid="stExpander"] summary::marker { display: none !important; }
 
-/* ── Ocultar flecha nativa de Streamlit ── */
-div[data-testid="stExpander"] summary svg,
-div[data-testid="stExpander"] summary [data-testid="stExpanderToggleIcon"],
-div[data-testid="stExpander"] summary > svg,
-div[data-testid="stExpander"] summary > span > svg,
-div[data-testid="stExpander"] summary span[data-testid="stExpanderToggleIcon"],
-div[data-testid="stExpander"] summary p ~ svg,
-div[data-testid="stExpander"] details > summary svg {
+/* ── Ocultar el texto/emoji del label, dejar solo la flecha ── */
+div[data-testid="stExpander"] summary p,
+div[data-testid="stExpander"] summary span.st-emotion-cache-ztfqz8,
+div[data-testid="stExpander"] summary [data-testid="stExpanderLabel"] {
     display: none !important;
     width: 0 !important;
-    height: 0 !important;
     overflow: hidden !important;
 }
-/* Forzar que el summary solo muestre el emoji, sin espacios extra */
-div[data-testid="stExpander"] summary > * {
-    vertical-align: middle !important;
-}
-div[data-testid="stExpander"] summary > span:not(:first-child) {
-    display: none !important;
+/* Mostrar y estilizar la flecha nativa */
+div[data-testid="stExpander"] summary svg,
+div[data-testid="stExpander"] summary [data-testid="stExpanderToggleIcon"] {
+    display: inline-block !important;
+    width: 20px !important;
+    height: 20px !important;
+    opacity: 0.7;
 }
 
 /* ── Panel desplegable ── */
@@ -2008,7 +2004,7 @@ div[data-testid="stExpander"] [data-testid="stExpanderDetails"] strong {
 </style>
 """, unsafe_allow_html=True)
 
-with st.expander("📤"):
+with st.expander("⠀"):
     st.markdown("**📤 Subir Excel a SharePoint**")
     st.caption("Fila 26 · cols A→AS → hoja Data")
     archivo = st.file_uploader("Excel", type=["xlsx","xlsm","xls"], key="up_sp", label_visibility="collapsed")
