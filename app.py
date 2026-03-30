@@ -7,23 +7,69 @@ import json
 import base64
 import openpyxl
 import pickle
+import tempfile
+import requests
+import msal
 from collections import defaultdict
 from pathlib import Path
 import streamlit as st
 import streamlit.components.v1 as components
 
-# Caché en disco: mismo Excel = carga al instante (al abrir, al cambiar código o restablecer)
+# Caché en disco
 _CACHE_DIR = Path(__file__).resolve().parent / ".wa123_cache"
 
-def _excel_cache_key():
-    paths = ["Analisis_Walmart.xlsx", "Analisis Walmart.xlsx"]
-    excel_path = next((p for p in paths if Path(p).exists()), None)
-    if not excel_path:
-        return None, None, None
-    p = Path(excel_path).resolve()
-    mtime = p.stat().st_mtime
-    key = hashlib.md5(f"{p}{mtime}".encode()).hexdigest()[:16]
-    return str(p), mtime, key
+def _descargar_excel_sharepoint() -> tuple:
+    """
+    Descarga el Excel desde SharePoint usando Azure App (client credentials).
+    Credenciales en st.secrets["sharepoint"]:
+        tenant_id, client_id, client_secret, site_url, file_path
+    Retorna (path_local: Path, cache_key: str)
+    """
+    cfg = st.secrets["sharepoint"]
+
+    # ── Autenticación MSAL ──
+    app_msal = msal.ConfidentialClientApplication(
+        cfg["client_id"],
+        authority=f"https://login.microsoftonline.com/{cfg['tenant_id']}",
+        client_credential=cfg["client_secret"],
+    )
+    token = app_msal.acquire_token_for_client(
+        scopes=["https://graph.microsoft.com/.default"]
+    )
+    if "access_token" not in token:
+        raise RuntimeError(
+            f"Error de autenticación SharePoint: {token.get('error_description', token)}"
+        )
+
+    headers = {"Authorization": f"Bearer {token['access_token']}"}
+
+    # ── Obtener Site ID ──
+    parts     = cfg["site_url"].rstrip("/").split("/")
+    hostname  = parts[2]                          # e.g. tuempresa.sharepoint.com
+    site_path = "/".join(parts[3:])               # e.g. sites/mi-sitio
+    site_resp = requests.get(
+        f"https://graph.microsoft.com/v1.0/sites/{hostname}:/{site_path}",
+        headers=headers,
+        timeout=30,
+    )
+    site_resp.raise_for_status()
+    site_id = site_resp.json()["id"]
+
+    # ── Descargar archivo ──
+    file_url = (
+        f"https://graph.microsoft.com/v1.0/sites/{site_id}"
+        f"/drive/root:{cfg['file_path']}:/content"
+    )
+    file_resp = requests.get(file_url, headers=headers, timeout=60)
+    file_resp.raise_for_status()
+
+    # ── Guardar en archivo temporal ──
+    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
+    tmp.write(file_resp.content)
+    tmp.close()
+
+    cache_key = hashlib.md5(file_resp.content).hexdigest()[:16]
+    return Path(tmp.name), cache_key
 
 st.set_page_config(page_title="Walmex · CFBC", layout="wide", initial_sidebar_state="collapsed")
 
@@ -52,15 +98,10 @@ iframe { display: block !important; margin: 0 !important; border: none !importan
 
 @st.cache_data(ttl=3600, show_spinner=False)
 def cargar_datos(url: str = "") -> dict:
-    excel_path, _, cache_key = _excel_cache_key()
-    if not excel_path:
-        raise FileNotFoundError("No se encontró Analisis_Walmart.xlsx. Súbelo al repo de GitHub.")
-    # Caché en disco: si el Excel no cambió, cargar al instante
+    # Descargar desde SharePoint (cacheado 1 hora por @st.cache_data)
+    excel_path, cache_key = _descargar_excel_sharepoint()
     _CACHE_DIR.mkdir(parents=True, exist_ok=True)
     data_cache_file = _CACHE_DIR / f"data_{cache_key}.pkl"
-    # if data_cache_file.exists():
-    #     with open(data_cache_file, "rb") as f:
-    #         return pickle.load(f)
     wb = openpyxl.load_workbook(excel_path, data_only=True)
     ws = wb['Data']
 
@@ -407,8 +448,7 @@ def cargar_datos(url: str = "") -> dict:
     return result_dict
 
 try:
-    _, _, _ck = _excel_cache_key()
-    DATA = cargar_datos(_ck or "")
+    DATA = cargar_datos()
 except Exception as e:
     st.error(f"❌ Error cargando datos: {e}")
     st.stop()
@@ -1626,17 +1666,6 @@ def build_html():
     ).decode('ascii')
     return HTML.replace('__DATA_JSON__', data_json)
 
-# Caché del HTML: evita reconstruir el JSON gigante en cada rerun
-_, _, html_cache_key = _excel_cache_key()
-html_cache_file = _CACHE_DIR / f"html_{html_cache_key}.html" if html_cache_key else None
-if html_cache_file and html_cache_file.exists():
-    html_content = html_cache_file.read_text(encoding="utf-8")
-else:
-    html_content = build_html()
-    if html_cache_file:
-        try:
-            _CACHE_DIR.mkdir(parents=True, exist_ok=True)
-            html_cache_file.write_text(html_content, encoding="utf-8")
-        except Exception:
-            pass
+# Caché del HTML: construir directamente (cache ya manejado por @st.cache_data)
+html_content = build_html()
 components.html(html_content, height=1400, scrolling=True)
