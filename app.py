@@ -1903,74 +1903,87 @@ if params.get("reload") == ["1"]:
     st.query_params.clear()
     st.rerun()
 
-# ── Panel de subida: botón ··· mínimo fijo junto al ↺ ───────────────────────
+# ── Panel de subida: flechita discreta sin fondo ni borde ───────────────────
 st.markdown("""
 <style>
-/* Contenedor — fijo, sin borde ni fondo propio */
+/* ── Contenedor fijo del expander ── */
 div[data-testid="stExpander"] {
-    position: fixed !important;
-    top: 8px !important;
-    right: 50px !important;
-    z-index: 9999 !important;
-    width: fit-content !important;
-    min-width: 0 !important;
+    position: fixed;
+    top: 6px;
+    right: 10px;          /* extremo derecho, sin tapar nada */
+    z-index: 9999;
+    width: auto;
+    min-width: 0;
     background: transparent !important;
     border: none !important;
     box-shadow: none !important;
-    padding: 0 !important;
-    margin: 0 !important;
 }
-/* Botón ··· — solo tres puntos, tamaño mínimo */
+
+/* ── Solo la flechita — sin fondo, sin borde ── */
 div[data-testid="stExpander"] summary {
     display: inline-flex !important;
     align-items: center !important;
-    justify-content: center !important;
-    width: 24px !important;
-    height: 24px !important;
-    padding: 0 !important;
-    margin: 0 !important;
-    font-size: .6rem !important;
+    padding: 2px 4px !important;
+    font-size: 1.1rem !important;
     font-weight: 400 !important;
     color: #aaa !important;
     background: transparent !important;
     border: none !important;
-    border-radius: 4px !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
     cursor: pointer !important;
-    letter-spacing: 1.5px !important;
+    min-height: 0 !important;
     line-height: 1 !important;
-    list-style: none !important;
     transition: color .15s !important;
+    list-style: none !important;
+    outline: none !important;
 }
 div[data-testid="stExpander"] summary::-webkit-details-marker { display: none; }
 div[data-testid="stExpander"] summary::marker { display: none; }
-div[data-testid="stExpander"] summary:hover { color: #0071ce !important; }
-/* Ocultar flecha de Streamlit */
+div[data-testid="stExpander"] summary:hover {
+    color: #0071ce !important;
+    background: transparent !important;
+    border: none !important;
+}
+div[data-testid="stExpander"] summary:focus {
+    outline: none !important;
+    box-shadow: none !important;
+}
+
+/* ── Ocultar la flecha nativa de Streamlit ── */
 div[data-testid="stExpander"] summary svg,
 div[data-testid="stExpander"] summary [data-testid="stExpanderToggleIcon"] {
     display: none !important;
 }
-/* Panel desplegable — compacto, alineado a la derecha */
+
+/* ── Panel desplegable — aparece abajo a la derecha ── */
 div[data-testid="stExpander"] > div[data-testid="stExpanderDetails"] {
     position: absolute !important;
     right: 0 !important;
-    top: 28px !important;
-    width: 240px !important;
-    padding: 10px 12px !important;
+    top: calc(100% + 4px) !important;
+    min-width: 280px !important;
+    padding: 12px 14px !important;
     background: #fff !important;
     border: 1px solid #ddd !important;
     border-radius: 6px !important;
-    box-shadow: 0 4px 14px rgba(0,0,0,.12) !important;
+    box-shadow: 0 4px 18px rgba(0,0,0,.13) !important;
 }
-/* Reducir tamaño de todo el contenido interno */
-div[data-testid="stExpander"] > div[data-testid="stExpanderDetails"] * {
+
+/* ── Texto interno compacto ── */
+div[data-testid="stExpander"] > div[data-testid="stExpanderDetails"] p,
+div[data-testid="stExpander"] > div[data-testid="stExpanderDetails"] small {
     font-size: .7rem !important;
+    color: #555 !important;
+    margin: 0 0 6px 0 !important;
 }
-div[data-testid="stExpander"] > div[data-testid="stExpanderDetails"] p { margin: 0 0 4px !important; }
-div[data-testid="stExpander"] > div[data-testid="stExpanderDetails"] small { color: #777 !important; }
+div[data-testid="stExpander"] > div[data-testid="stExpanderDetails"] strong {
+    font-size: .72rem !important;
+    color: #222 !important;
+}
 </style>
 """, unsafe_allow_html=True)
 
-with st.expander("···"):
+with st.expander("⬆️"):
     st.markdown("**📤 Subir Excel a SharePoint**")
     st.caption("Fila 26 · cols A→AS → hoja Data")
     archivo = st.file_uploader("Excel", type=["xlsx","xlsm","xls"], key="up_sp", label_visibility="collapsed")
