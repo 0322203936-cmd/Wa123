@@ -21,7 +21,6 @@ _CACHE_DIR = Path(__file__).resolve().parent / ".wa123_cache"
 def _descargar_excel_sharepoint() -> tuple:
     """
     Descarga el Excel desde SharePoint usando Azure App (client credentials).
-    Busca el archivo por nombre en todos los drives del sitio.
     Credenciales en st.secrets["sharepoint"]:
         tenant_id, client_id, client_secret, site_url, file_path
     Retorna (path_local: Path, cache_key: str)
@@ -46,8 +45,8 @@ def _descargar_excel_sharepoint() -> tuple:
 
     # ── Obtener Site ID ──
     parts     = cfg["site_url"].rstrip("/").split("/")
-    hostname  = parts[2]
-    site_path = "/".join(parts[3:])
+    hostname  = parts[2]                          # e.g. tuempresa.sharepoint.com
+    site_path = "/".join(parts[3:])               # e.g. sites/mi-sitio
     site_resp = requests.get(
         f"https://graph.microsoft.com/v1.0/sites/{hostname}:/{site_path}",
         headers=headers,
@@ -56,47 +55,13 @@ def _descargar_excel_sharepoint() -> tuple:
     site_resp.raise_for_status()
     site_id = site_resp.json()["id"]
 
-    # ── Obtener todos los drives del sitio ──
-    drives_resp = requests.get(
-        f"https://graph.microsoft.com/v1.0/sites/{site_id}/drives",
-        headers=headers,
-        timeout=30,
+    # ── Descargar archivo ──
+    file_url = (
+        f"https://graph.microsoft.com/v1.0/sites/{site_id}"
+        f"/drive/root:{cfg['file_path']}:/content"
     )
-    drives_resp.raise_for_status()
-    drives = drives_resp.json().get("value", [])
-
-    # ── Buscar el archivo en cada drive usando su ruta relativa ──
-    # file_path en secrets: /requerimiento vs proyeccion/WALMEX/Analisis Walmart.xlsx
-    # Quitamos la parte de la biblioteca del inicio si coincide con el nombre del drive
-    file_path = cfg["file_path"].lstrip("/")
-    file_resp = None
-
-    for drive in drives:
-        drive_id   = drive["id"]
-        drive_name = drive["name"]
-
-        # Intentar ruta completa tal como viene en secrets
-        url1 = f"https://graph.microsoft.com/v1.0/drives/{drive_id}/root:/{file_path}:/content"
-        r = requests.get(url1, headers=headers, timeout=60)
-        if r.status_code == 200:
-            file_resp = r
-            break
-
-        # Intentar quitando el primer segmento de la ruta (nombre de biblioteca)
-        segments = file_path.split("/")
-        if len(segments) > 1:
-            sub_path = "/".join(segments[1:])
-            url2 = f"https://graph.microsoft.com/v1.0/drives/{drive_id}/root:/{sub_path}:/content"
-            r2 = requests.get(url2, headers=headers, timeout=60)
-            if r2.status_code == 200:
-                file_resp = r2
-                break
-
-    if file_resp is None:
-        raise RuntimeError(
-            f"No se encontró el archivo '{cfg['file_path']}' en ningún drive del sitio. "
-            f"Drives disponibles: {[d['name'] for d in drives]}"
-        )
+    file_resp = requests.get(file_url, headers=headers, timeout=60)
+    file_resp.raise_for_status()
 
     # ── Guardar en archivo temporal ──
     tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
@@ -482,12 +447,8 @@ def cargar_datos(url: str = "") -> dict:
         pass
     return result_dict
 
-# ── Botón de recarga: limpiar caché si se solicitó ──
-if st.query_params.get("reload") == "1":
-    cargar_datos.clear()
-    st.query_params.clear()
-
- — borrar después de encontrar la ruta
+# ══════════════════════════════════════════════════════
+# DIAGNÓSTICO TEMPORAL — borrar después de encontrar la ruta
 # ══════════════════════════════════════════════════════
 def _diagnostico_sharepoint():
     cfg = st.secrets["sharepoint"]
@@ -538,12 +499,6 @@ if st.sidebar.button("🔍 Diagnóstico SharePoint"):
     st.stop()
 # ══════════════════════════════════════════════════════
 
-# Botón de recarga: limpia caché y vuelve a descargar desde SharePoint
-if st.query_params.get("reload") == "1":
-    cargar_datos.clear()
-    st.query_params.clear()
-    st.rerun()
-
 try:
     DATA = cargar_datos()
 except Exception as e:
@@ -572,20 +527,6 @@ body{background:#fff;font-family:Arial,sans-serif;font-size:12px;color:#111}
   cursor:pointer;transition:.15s;white-space:nowrap;flex-shrink:0;
 }
 .btn-print:hover{background:#0071ce;color:#fff}
-.btn-reload{
-  display:inline-flex;align-items:center;justify-content:center;
-  padding:4px 8px;border-radius:4px;border:1px solid #ddd;
-  background:#fff;color:#999;font-size:.75rem;
-  cursor:pointer;transition:.15s;flex-shrink:0;
-}
-.btn-reload:hover{border-color:#0071ce;color:#0071ce;background:#f0f7ff}
-.btn-reload{
-  display:inline-flex;align-items:center;justify-content:center;
-  width:26px;height:26px;border-radius:4px;border:1px solid #ccc;
-  background:#fff;color:#888;font-size:.8rem;
-  cursor:pointer;transition:.15s;margin-left:4px;flex-shrink:0;
-}
-.btn-reload:hover{border-color:#0071ce;color:#0071ce;background:#f0f7ff}
 .ctrl{display:flex;align-items:center;gap:8px;padding:5px 16px;background:#f5f7fa;border-bottom:1px solid #ddd;flex-wrap:wrap}
 .ctrl label{font-size:.7rem;color:#555;font-weight:600}
 select{border:1px solid #bbb;border-radius:4px;padding:3px 7px;font-size:.72rem;cursor:pointer;background:#fff}
@@ -660,7 +601,6 @@ html,body{height:auto;overflow-y:auto}
         <div>Semana&nbsp;&nbsp;<strong id="hdrSem">—</strong></div>
       </div>
       <button class="btn-print" onclick="imprimirReporte()">🖨️ Imprimir</button>
-      <button class="btn-reload" onclick="recargarDatos()" title="Recargar datos de SharePoint">🔄</button>
     </div>
   </div>
   <div class="hdr-tienda">Nombre de Tienda&nbsp;&nbsp;<strong id="hdrTienda">—</strong></div>
@@ -1710,18 +1650,6 @@ function imprimirReporte(){
   var win  = window.open(url, '_blank');
   // Liberar URL de objeto cuando la ventana cargue
   if(win){ win.addEventListener('load', function(){ URL.revokeObjectURL(url); }); }
-}
-
-function recargarDatos(){
-  if(confirm('¿Recargar datos desde SharePoint?')){
-    window.parent.location.href = window.parent.location.href.split('?')[0] + '?reload=1';
-  }
-}
-
-function recargarDatos(){
-  // Redirige con ?reload=1 para que Streamlit limpie el caché
-  var url = window.parent.location.href.split('?')[0] + '?reload=1';
-  window.parent.location.href = url;
 }
 
 window.addEventListener('load', init);
