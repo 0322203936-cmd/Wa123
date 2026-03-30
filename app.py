@@ -1962,7 +1962,22 @@ div[data-testid="stExpander"] summary::marker { display: none !important; }
 
 /* ── Ocultar flecha nativa de Streamlit ── */
 div[data-testid="stExpander"] summary svg,
-div[data-testid="stExpander"] summary [data-testid="stExpanderToggleIcon"] {
+div[data-testid="stExpander"] summary [data-testid="stExpanderToggleIcon"],
+div[data-testid="stExpander"] summary > svg,
+div[data-testid="stExpander"] summary > span > svg,
+div[data-testid="stExpander"] summary span[data-testid="stExpanderToggleIcon"],
+div[data-testid="stExpander"] summary p ~ svg,
+div[data-testid="stExpander"] details > summary svg {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+    overflow: hidden !important;
+}
+/* Forzar que el summary solo muestre el emoji, sin espacios extra */
+div[data-testid="stExpander"] summary > * {
+    vertical-align: middle !important;
+}
+div[data-testid="stExpander"] summary > span:not(:first-child) {
     display: none !important;
 }
 
