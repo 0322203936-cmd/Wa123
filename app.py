@@ -689,13 +689,6 @@ body{background:#fff;font-family:Arial,sans-serif;font-size:12px;color:#111}
   cursor:pointer;transition:.15s;white-space:nowrap;flex-shrink:0;
 }
 .btn-reload:hover{border-color:#0071ce;color:#0071ce}
-.btn-gear{
-  display:inline-flex;align-items:center;
-  padding:4px 7px;border-radius:4px;border:none;
-  background:transparent;color:#ccc;font-size:.8rem;
-  cursor:pointer;transition:.15s;flex-shrink:0;
-}
-.btn-gear:hover{color:#555}
 .ctrl{display:flex;align-items:center;gap:8px;padding:5px 16px;background:#f5f7fa;border-bottom:1px solid #ddd;flex-wrap:wrap}
 .ctrl label{font-size:.7rem;color:#555;font-weight:600}
 select{border:1px solid #bbb;border-radius:4px;padding:3px 7px;font-size:.72rem;cursor:pointer;background:#fff}
@@ -771,7 +764,6 @@ html,body{height:auto;overflow-y:auto}
       </div>
       <button class="btn-print" onclick="imprimirReporte()">🖨️ Imprimir</button>
       <button class="btn-reload" onclick="recargarDatos()" title="Actualizar datos">↺</button>
-      <button class="btn-gear" onclick="abrirPanel()" title="Actualizar datos SharePoint">⚙</button>
     </div>
   </div>
   <div class="hdr-tienda">Nombre de Tienda&nbsp;&nbsp;<strong id="hdrTienda">—</strong></div>
@@ -1746,21 +1738,6 @@ function recargarDatos(){
   }
 }
 
-function abrirPanel(){
-  // Envía mensaje al iframe listener de Streamlit (mismo origen)
-  try{
-    // Busca todos los iframes del padre y manda el mensaje
-    var frames = window.parent.document.querySelectorAll('iframe');
-    frames.forEach(function(f){
-      try{ f.contentWindow.postMessage('OPEN_UPLOAD','*'); }catch(ex){}
-    });
-    // También intenta navegación directa como fallback
-    window.parent.location.search = '?gear=1';
-  }catch(e){
-    try{ window.parent.location.search = '?gear=1'; }catch(ex){}
-  }
-}
-
 function imprimirReporte(){
   var tienda  = document.getElementById('hdrTienda').textContent;
   var semana  = document.getElementById('hdrSem').textContent;
@@ -1926,52 +1903,57 @@ if params.get("reload") == ["1"]:
     st.query_params.clear()
     st.rerun()
 
-# ── Panel de subida activado por la tuerquita ────────────────────────────────
-if "show_upload" not in st.session_state:
-    st.session_state["show_upload"] = False
+# ── Panel de subida: expander simple que siempre funciona ────────────────────
+st.markdown("""
+<style>
+/* Hacer el expander pequeño y discreto, alineado arriba */
+div[data-testid="stExpander"] {
+    position: fixed;
+    top: 4px;
+    right: 10px;
+    z-index: 9999;
+    width: auto;
+    min-width: 0;
+    background: white;
+    border: 1px solid #ddd !important;
+    border-radius: 6px;
+    box-shadow: 0 2px 8px rgba(0,0,0,.12);
+}
+div[data-testid="stExpander"] summary {
+    padding: 3px 10px !important;
+    font-size: .72rem !important;
+    color: #888 !important;
+    letter-spacing: 2px;
+    min-height: 0 !important;
+}
+div[data-testid="stExpander"] summary:hover { color: #333 !important; }
+div[data-testid="stExpander"] > div[data-testid="stExpanderDetails"] {
+    padding: 10px 14px !important;
+    min-width: 320px;
+    right: 0;
+    position: absolute;
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    box-shadow: 0 4px 16px rgba(0,0,0,.15);
+}
+</style>
+""", unsafe_allow_html=True)
 
-# Detectar ?gear=1 (fallback por si postMessage no funciona)
-if st.query_params.get("gear") == "1":
-    st.session_state["show_upload"] = True
-    st.query_params.clear()
-    st.rerun()
-
-# Listener postMessage: recibe "OPEN_UPLOAD" desde el iframe del dashboard
-components.html("""
-<script>
-window.addEventListener('message', function(e){
-    if(e.data === 'OPEN_UPLOAD'){
-        try { window.parent.location.search = '?gear=1'; }
-        catch(err) { window.location.search = '?gear=1'; }
-    }
-}, false);
-</script>
-""", height=0, scrolling=False)
-
-# Panel de subida — aparece arriba cuando se activa desde la tuerca
-if st.session_state.get("show_upload"):
-    with st.container():
-        st.markdown("---")
-        st.markdown("**📤 Actualizar datos en SharePoint**")
-        st.caption("Los datos desde la fila 26 (cols A→AS) reemplazarán la hoja `Data` desde fila 1.")
-        archivo = st.file_uploader("Selecciona tu Excel (.xlsx / .xls)", type=["xlsx","xlsm","xls"], key="up_sp", label_visibility="collapsed")
-        col1, col2 = st.columns([3,1])
-        with col1:
-            if st.button("⬆️ Subir a SharePoint", type="primary", use_container_width=True):
-                if archivo is None:
-                    st.warning("Primero selecciona un archivo.")
-                else:
-                    with st.spinner("Subiendo..."):
-                        try:
-                            msg = _subir_excel_sharepoint(archivo.read())
-                            st.success(msg)
-                        except Exception as e:
-                            st.error(f"❌ {e}")
-        with col2:
-            if st.button("✕ Cerrar", use_container_width=True):
-                st.session_state["show_upload"] = False
-                st.rerun()
-        st.markdown("---")
+with st.expander("⋯"):
+    st.markdown("**📤 Actualizar datos en SharePoint**")
+    st.caption("Los datos desde la fila 26 (cols A→AS) reemplazarán la hoja `Data` desde fila 1.")
+    archivo = st.file_uploader("Selecciona tu Excel (.xlsx / .xls)", type=["xlsx","xlsm","xls"], key="up_sp", label_visibility="collapsed")
+    if st.button("⬆️ Subir a SharePoint", type="primary", use_container_width=True):
+        if archivo is None:
+            st.warning("Primero selecciona un archivo.")
+        else:
+            with st.spinner("Subiendo..."):
+                try:
+                    msg = _subir_excel_sharepoint(archivo.read())
+                    st.success(msg)
+                except Exception as e:
+                    st.error(f"❌ {e}")
 
 # ── Render del dashboard ──────────────────────────────────────────────────────
 html_content = build_html()
