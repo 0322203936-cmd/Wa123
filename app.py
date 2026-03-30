@@ -231,9 +231,26 @@ iframe { display: block !important; margin: 0 !important; border: none !importan
 </style>
 """, unsafe_allow_html=True)
 
+# Archivo de caché permanente — sobrevive recargas y reinicios
+_CACHE_LATEST = _CACHE_DIR / "data_latest.pkl"
+
+def _cargar_desde_disco():
+    """Carga el último caché guardado en disco. Retorna None si no existe."""
+    if _CACHE_LATEST.exists():
+        try:
+            with open(_CACHE_LATEST, "rb") as f:
+                return pickle.load(f)
+        except Exception:
+            pass
+    return None
+
 @st.cache_data(ttl=3600, show_spinner=False)
 def cargar_datos(url: str = "") -> dict:
-    # Descargar desde SharePoint (cacheado 1 hora por @st.cache_data)
+    # Intentar cargar desde disco primero (instantáneo)
+    datos_disco = _cargar_desde_disco()
+    if datos_disco is not None:
+        return datos_disco
+    # Si no hay caché en disco, descargar de SharePoint
     excel_path, cache_key = _descargar_excel_sharepoint()
     _CACHE_DIR.mkdir(parents=True, exist_ok=True)
     data_cache_file = _CACHE_DIR / f"data_{cache_key}.pkl"
@@ -575,8 +592,10 @@ def cargar_datos(url: str = "") -> dict:
         'tienda_ruta': TIENDA_RUTA,
         'gasto_data': {k: {s: dict(p) for s,p in v.items()} for k,v in gasto_data.items()}
     }
+    # Guardar en disco como caché permanente (sobrevive recargas)
     try:
-        with open(data_cache_file, "wb") as f:
+        _CACHE_DIR.mkdir(parents=True, exist_ok=True)
+        with open(_CACHE_LATEST, "wb") as f:
             pickle.dump(result_dict, f)
     except Exception:
         pass
@@ -1877,6 +1896,8 @@ def build_html():
 # Verificar si se pidió recarga vía query params
 params = st.query_params
 if params.get("reload") == ["1"]:
+    if _CACHE_LATEST.exists():
+        _CACHE_LATEST.unlink()
     cargar_datos.clear()
     st.query_params.clear()
     st.rerun()
@@ -1930,7 +1951,6 @@ with st.expander("⋯"):
                 try:
                     msg = _subir_excel_sharepoint(archivo.read())
                     st.success(msg)
-                    cargar_datos.clear()
                 except Exception as e:
                     st.error(f"❌ {e}")
 
