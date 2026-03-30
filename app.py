@@ -99,14 +99,26 @@ def _subir_excel_sharepoint(archivo_local_bytes: bytes) -> str:
     tmp_sp.write(sp_resp.content)
     tmp_sp.close()
 
-    wb_local = openpyxl.load_workbook(io.BytesIO(archivo_local_bytes), data_only=True)
-    ws_local = wb_local.active
+    import pandas as pd
     COL_INI, COL_FIN, FILA_LOCAL = 1, 45, 26
     filas = []
-    for row in ws_local.iter_rows(min_row=FILA_LOCAL, min_col=COL_INI, max_col=COL_FIN, values_only=True):
-        if all(v is None for v in row):
-            break
-        filas.append(row)
+    # Intentar openpyxl (xlsx) primero, luego fallback para .xls
+    try:
+        wb_local = openpyxl.load_workbook(io.BytesIO(archivo_local_bytes), data_only=True)
+        ws_local = wb_local.active
+        for row in ws_local.iter_rows(min_row=FILA_LOCAL, min_col=COL_INI, max_col=COL_FIN, values_only=True):
+            if all(v is None for v in row):
+                break
+            filas.append(tuple(row))
+    except Exception:
+        for engine in ("openpyxl", "xlrd"):
+            try:
+                df = pd.read_excel(io.BytesIO(archivo_local_bytes), engine=engine, header=None)
+                df = df.iloc[FILA_LOCAL - 1:, COL_INI - 1:COL_FIN].dropna(how="all")
+                filas = [tuple(r) for r in df.values.tolist()]
+                break
+            except Exception:
+                continue
     if not filas:
         return "⚠️ No se encontraron datos desde la fila 26."
 
@@ -1846,7 +1858,7 @@ div[data-testid="stExpander"] > div[data-testid="stExpanderDetails"] {
 with st.expander("⋯"):
     st.markdown("**📤 Actualizar datos en SharePoint**")
     st.caption("Los datos desde la fila 26 (cols A→AS) reemplazarán la hoja `Data` desde fila 1.")
-    archivo = st.file_uploader("Selecciona tu Excel (.xlsx)", type=["xlsx","xlsm"], key="up_sp", label_visibility="collapsed")
+    archivo = st.file_uploader("Selecciona tu Excel (.xlsx / .xls)", type=["xlsx","xlsm","xls"], key="up_sp", label_visibility="collapsed")
     if st.button("⬆️ Subir a SharePoint", type="primary", use_container_width=True):
         if archivo is None:
             st.warning("Primero selecciona un archivo.")
