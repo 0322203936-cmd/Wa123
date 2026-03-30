@@ -1906,31 +1906,37 @@ if params.get("reload") == ["1"]:
 # ── Panel de subida: expander simple que siempre funciona ────────────────────
 st.markdown("""
 <style>
-/* Hacer el expander pequeño y discreto, alineado arriba */
+/* Expander invisible — solo 3 puntitos discretos */
 div[data-testid="stExpander"] {
     position: fixed;
-    top: 4px;
-    right: 10px;
+    bottom: 10px;
+    right: 14px;
     z-index: 9999;
     width: auto;
     min-width: 0;
-    background: white;
-    border: 1px solid #ddd !important;
-    border-radius: 6px;
-    box-shadow: 0 2px 8px rgba(0,0,0,.12);
+    background: transparent;
+    border: none !important;
+    box-shadow: none !important;
 }
 div[data-testid="stExpander"] summary {
-    padding: 3px 10px !important;
-    font-size: .72rem !important;
-    color: #888 !important;
-    letter-spacing: 2px;
+    padding: 2px 6px !important;
+    font-size: .8rem !important;
+    color: #bbb !important;
+    letter-spacing: 3px;
     min-height: 0 !important;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    list-style: none;
 }
-div[data-testid="stExpander"] summary:hover { color: #333 !important; }
+div[data-testid="stExpander"] summary:hover { color: #666 !important; }
+/* Ocultar flecha nativa del expander */
+div[data-testid="stExpander"] summary svg { display: none !important; }
 div[data-testid="stExpander"] > div[data-testid="stExpanderDetails"] {
     padding: 10px 14px !important;
     min-width: 320px;
     right: 0;
+    bottom: 24px;
     position: absolute;
     background: white;
     border: 1px solid #ddd;
