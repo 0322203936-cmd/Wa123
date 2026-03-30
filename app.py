@@ -1903,14 +1903,14 @@ if params.get("reload") == ["1"]:
     st.query_params.clear()
     st.rerun()
 
-# ── Panel de subida: flechita discreta sin fondo ni borde ───────────────────
+# ── Panel de subida: solo la flechita azul, sin nada alrededor ──────────────
 st.markdown("""
 <style>
-/* ── Contenedor fijo del expander ── */
+/* ── Contenedor fijo ── */
 div[data-testid="stExpander"] {
     position: fixed;
     top: 6px;
-    right: 10px;          /* extremo derecho, sin tapar nada */
+    right: 4px;
     z-index: 9999;
     width: auto;
     min-width: 0;
@@ -1919,44 +1919,39 @@ div[data-testid="stExpander"] {
     box-shadow: none !important;
 }
 
-/* ── Solo la flechita — sin fondo, sin borde ── */
+/* ── Solo el emoji, sin nada alrededor ── */
 div[data-testid="stExpander"] summary {
     display: inline-flex !important;
     align-items: center !important;
-    padding: 2px 4px !important;
-    font-size: 1.1rem !important;
-    font-weight: 400 !important;
-    color: #aaa !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    font-size: 1.15rem !important;
     background: transparent !important;
     border: none !important;
     box-shadow: none !important;
+    outline: none !important;
     border-radius: 0 !important;
     cursor: pointer !important;
     min-height: 0 !important;
     line-height: 1 !important;
-    transition: color .15s !important;
     list-style: none !important;
-    outline: none !important;
+    -webkit-appearance: none !important;
+    appearance: none !important;
+    opacity: 0.75;
+    transition: opacity .15s !important;
 }
+div[data-testid="stExpander"] summary:hover  { opacity: 1; }
+div[data-testid="stExpander"] summary:focus  { outline: none !important; box-shadow: none !important; }
 div[data-testid="stExpander"] summary::-webkit-details-marker { display: none; }
 div[data-testid="stExpander"] summary::marker { display: none; }
-div[data-testid="stExpander"] summary:hover {
-    color: #0071ce !important;
-    background: transparent !important;
-    border: none !important;
-}
-div[data-testid="stExpander"] summary:focus {
-    outline: none !important;
-    box-shadow: none !important;
-}
 
-/* ── Ocultar la flecha nativa de Streamlit ── */
+/* ── Ocultar flecha nativa de Streamlit ── */
 div[data-testid="stExpander"] summary svg,
 div[data-testid="stExpander"] summary [data-testid="stExpanderToggleIcon"] {
     display: none !important;
 }
 
-/* ── Panel desplegable — aparece abajo a la derecha ── */
+/* ── Panel desplegable ── */
 div[data-testid="stExpander"] > div[data-testid="stExpanderDetails"] {
     position: absolute !important;
     right: 0 !important;
@@ -1969,7 +1964,7 @@ div[data-testid="stExpander"] > div[data-testid="stExpanderDetails"] {
     box-shadow: 0 4px 18px rgba(0,0,0,.13) !important;
 }
 
-/* ── Texto interno compacto ── */
+/* ── Texto interno ── */
 div[data-testid="stExpander"] > div[data-testid="stExpanderDetails"] p,
 div[data-testid="stExpander"] > div[data-testid="stExpanderDetails"] small {
     font-size: .7rem !important;
@@ -1983,7 +1978,7 @@ div[data-testid="stExpander"] > div[data-testid="stExpanderDetails"] strong {
 </style>
 """, unsafe_allow_html=True)
 
-with st.expander("⬆️"):
+with st.expander("📤"):
     st.markdown("**📤 Subir Excel a SharePoint**")
     st.caption("Fila 26 · cols A→AS → hoja Data")
     archivo = st.file_uploader("Excel", type=["xlsx","xlsm","xls"], key="up_sp", label_visibility="collapsed")
