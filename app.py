@@ -1906,12 +1906,19 @@ if params.get("reload") == ["1"]:
 # ── Panel de subida: solo ícono, sin ningún cuadro alrededor ────────────────
 st.markdown("""
 <style>
+/* ── Evitar que wrappers de Streamlit rompan el fixed ── */
+div[data-testid="stVerticalBlock"] > div:has(div[data-testid="stExpander"]),
+section[data-testid="stMain"] > div:has(div[data-testid="stExpander"]) {
+    position: static !important;
+    overflow: visible !important;
+}
 /* ── Posición fija ── */
 div[data-testid="stExpander"] {
     position: fixed !important;
     top: 6px !important;
-    right: 4px !important;
-    z-index: 9999 !important;
+    right: 18px !important;
+    left: auto !important;
+    z-index: 99999 !important;
     width: auto !important;
     min-width: 0 !important;
     background: transparent !important;
@@ -1919,6 +1926,8 @@ div[data-testid="stExpander"] {
     box-shadow: none !important;
     border-radius: 0 !important;
     padding: 0 !important;
+    transform: none !important;
+    margin: 0 !important;
 }
 
 /* ── Matar borde en TODOS los wrappers internos ── */
