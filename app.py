@@ -74,11 +74,10 @@ def _descargar_excel_sharepoint() -> tuple:
 
 def _subir_excel_sharepoint(archivo_local_bytes: bytes) -> str:
     """
-    Lee el Excel local (desde fila 26, cols A→AS),
-    descarga el Excel de SharePoint, reemplaza la hoja 'Data'
-    desde fila 1 col A→AS con esos datos, y sube el archivo de vuelta.
-    Retorna mensaje de resultado.
+    Lee el Excel local (desde fila 26, cols A→AS = cols 1-45),
+    reemplaza la hoja 'Data' de SharePoint desde fila 1 col A→AS.
     """
+    import io
     cfg = st.secrets["sharepoint"]
 
     # ── Autenticación MSAL ──
@@ -91,94 +90,80 @@ def _subir_excel_sharepoint(archivo_local_bytes: bytes) -> str:
         scopes=["https://graph.microsoft.com/.default"]
     )
     if "access_token" not in token:
-        raise RuntimeError(
-            f"Error de autenticación: {token.get('error_description', token)}"
-        )
-    headers = {"Authorization": f"Bearer {token['access_token']}"}
+        raise RuntimeError(f"Error auth: {token.get('error_description', token)}")
+    hdrs = {"Authorization": f"Bearer {token['access_token']}"}
 
-    # ── Obtener Site ID ──
+    # ── Site ID ──
     parts     = cfg["site_url"].rstrip("/").split("/")
     hostname  = parts[2]
     site_path = "/".join(parts[3:])
-    site_resp = requests.get(
+    site_id   = requests.get(
         f"https://graph.microsoft.com/v1.0/sites/{hostname}:/{site_path}",
-        headers=headers, timeout=30,
+        headers=hdrs, timeout=30,
+    ).raise_for_status() or requests.get(
+        f"https://graph.microsoft.com/v1.0/sites/{hostname}:/{site_path}",
+        headers=hdrs, timeout=30,
+    ).json()["id"]
+    # Forma limpia:
+    r = requests.get(
+        f"https://graph.microsoft.com/v1.0/sites/{hostname}:/{site_path}",
+        headers=hdrs, timeout=30,
     )
-    site_resp.raise_for_status()
-    site_id = site_resp.json()["id"]
+    r.raise_for_status()
+    site_id = r.json()["id"]
 
-    # ── Descargar el Excel de SharePoint para modificarlo ──
-    file_url = (
-        f"https://graph.microsoft.com/v1.0/sites/{site_id}"
-        f"/drive/root:{cfg['file_path']}:/content"
-    )
-    file_resp = requests.get(file_url, headers=headers, timeout=60)
-    file_resp.raise_for_status()
+    file_base = f"https://graph.microsoft.com/v1.0/sites/{site_id}/drive/root:{cfg['file_path']}"
 
-    # ── Guardar SharePoint Excel en temporal ──
+    # ── Descargar Excel de SharePoint ──
+    sp_resp = requests.get(f"{file_base}:/content", headers=hdrs, timeout=60)
+    sp_resp.raise_for_status()
     tmp_sp = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
-    tmp_sp.write(file_resp.content)
+    tmp_sp.write(sp_resp.content)
     tmp_sp.close()
 
-    # ── Leer datos del Excel LOCAL desde fila 26, cols A(1) → AS(45) ──
-    import io
+    # ── Leer datos del Excel LOCAL desde fila 26, cols A(1)→AS(45) ──
     wb_local = openpyxl.load_workbook(io.BytesIO(archivo_local_bytes), data_only=True)
-    ws_local = wb_local.active  # primera hoja visible
+    ws_local = wb_local.active
+    COL_INICIO, COL_FIN, FILA_LOCAL = 1, 45, 26
 
-    # Recopilar filas de datos: fila 26 en adelante (índice 26), cols 1-45
-    filas_datos = []
-    COL_INICIO = 1   # A
-    COL_FIN    = 45  # AS
-    FILA_INICIO_LOCAL = 26
-
+    filas = []
     for row in ws_local.iter_rows(
-        min_row=FILA_INICIO_LOCAL, min_col=COL_INICIO, max_col=COL_FIN, values_only=True
+        min_row=FILA_LOCAL, min_col=COL_INICIO, max_col=COL_FIN, values_only=True
     ):
-        # Detener si toda la fila está vacía
         if all(v is None for v in row):
             break
-        filas_datos.append(row)
+        filas.append(row)
 
-    if not filas_datos:
+    if not filas:
         return "⚠️ No se encontraron datos desde la fila 26 en el archivo subido."
 
-    # ── Abrir el Excel de SharePoint y reemplazar datos en hoja 'Data' ──
+    # ── Abrir Excel de SharePoint y reemplazar hoja Data ──
     wb_sp = openpyxl.load_workbook(tmp_sp.name)
     ws_sp = wb_sp['Data']
 
-    # Limpiar el rango destino primero (fila 1 en adelante, cols A→AS)
-    for row in ws_sp.iter_rows(
-        min_row=1, min_col=COL_INICIO, max_col=COL_FIN
-    ):
+    # Limpiar rango destino completo
+    for row in ws_sp.iter_rows(min_row=1, min_col=COL_INICIO, max_col=COL_FIN):
         for cell in row:
             cell.value = None
 
-    # Escribir los nuevos datos desde fila 1
-    for r_idx, fila in enumerate(filas_datos, start=1):
+    # Escribir nuevos datos desde fila 1
+    for r_idx, fila in enumerate(filas, start=1):
         for c_idx, valor in enumerate(fila, start=COL_INICIO):
             ws_sp.cell(row=r_idx, column=c_idx, value=valor)
 
-    # ── Guardar el workbook modificado en memoria y subir a SharePoint ──
+    # ── Subir de vuelta a SharePoint ──
     output = io.BytesIO()
     wb_sp.save(output)
     output.seek(0)
-
-    upload_url = (
-        f"https://graph.microsoft.com/v1.0/sites/{site_id}"
-        f"/drive/root:{cfg['file_path']}:/content"
-    )
-    up_headers = {
-        "Authorization": f"Bearer {token['access_token']}",
+    up_hdrs = {
+        **hdrs,
         "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     }
-    up_resp = requests.put(upload_url, headers=up_headers, data=output.read(), timeout=120)
-    up_resp.raise_for_status()
-
-    # Limpiar archivos temporales
+    up = requests.put(f"{file_base}:/content", headers=up_hdrs, data=output.read(), timeout=120)
+    up.raise_for_status()
     Path(tmp_sp.name).unlink(missing_ok=True)
 
-    n_filas = len(filas_datos)
-    return f"✅ ¡Listo! Se actualizaron {n_filas} filas en SharePoint (cols A→AS, hoja 'Data')."
+    return f"✅ ¡Listo! {len(filas)} filas actualizadas en SharePoint (hoja 'Data', cols A→AS)."
 
 
 st.set_page_config(page_title="Walmex · CFBC", layout="wide", initial_sidebar_state="collapsed")
@@ -644,13 +629,6 @@ body{background:#fff;font-family:Arial,sans-serif;font-size:12px;color:#111}
   cursor:pointer;transition:.15s;white-space:nowrap;flex-shrink:0;
 }
 .btn-reload:hover{border-color:#0071ce;color:#0071ce}
-.btn-dots{
-  display:inline-flex;align-items:center;justify-content:center;
-  width:26px;height:26px;border-radius:4px;border:1px solid transparent;
-  background:transparent;color:#aaa;font-size:.85rem;letter-spacing:1px;
-  cursor:pointer;transition:.15s;flex-shrink:0;padding:0;line-height:1;
-}
-.btn-dots:hover{border-color:#bbb;color:#555;background:#f5f5f5}
 .ctrl{display:flex;align-items:center;gap:8px;padding:5px 16px;background:#f5f7fa;border-bottom:1px solid #ddd;flex-wrap:wrap}
 .ctrl label{font-size:.7rem;color:#555;font-weight:600}
 select{border:1px solid #bbb;border-radius:4px;padding:3px 7px;font-size:.72rem;cursor:pointer;background:#fff}
@@ -725,7 +703,6 @@ html,body{height:auto;overflow-y:auto}
         <div>Semana&nbsp;&nbsp;<strong id="hdrSem">—</strong></div>
       </div>
       <button class="btn-print" onclick="imprimirReporte()">🖨️ Imprimir</button>
-      <button class="btn-dots" onclick="abrirPanelSubir()" title="Actualizar datos desde Excel">⋯</button>
       <button class="btn-reload" onclick="recargarDatos()" title="Actualizar datos">↺</button>
     </div>
   </div>
@@ -1793,17 +1770,6 @@ function imprimirReporte(){
 
 window.addEventListener('load', init);
 
-function abrirPanelSubir() {
-  // Navega el padre (Streamlit) a ?abrir_panel=1 para activar el sidebar
-  try {
-    var base = window.parent.location.href.split('?')[0];
-    window.parent.location.href = base + '?abrir_panel=1';
-  } catch(e) {
-    // Si hay restricciones cross-origin, intentar postMessage
-    window.parent.postMessage({type:'abrir_panel_subir'}, '*');
-  }
-}
-
 (function fixParent(){
   try {
     var p = window.parent.document;
@@ -1868,54 +1834,99 @@ def build_html():
     ).decode('ascii')
     return HTML.replace('__DATA_JSON__', data_json)
 
-# ── Manejar query params (recarga de datos y apertura de panel) ───────────────
-if "panel_subir" not in st.session_state:
-    st.session_state["panel_subir"] = False
-
+# Verificar si se pidió recarga vía query params
 _params = st.query_params
 if _params.get("reload") == ["1"]:
     cargar_datos.clear()
     st.query_params.clear()
     st.rerun()
-elif _params.get("abrir_panel") == ["1"]:
-    st.session_state["panel_subir"] = True
-    st.query_params.clear()
+
+# ── Botón flotante ⋯ y panel lateral para subir Excel ────────────────────────
+if "panel_subir" not in st.session_state:
+    st.session_state["panel_subir"] = False
+
+# CSS: botón flotante posicionado encima del iframe, alineado con Imprimir
+st.markdown("""
+<style>
+.btn-subir-float {
+    position: fixed;
+    top: 10px;
+    right: 54px;
+    z-index: 9999;
+    background: transparent;
+    border: none;
+    color: #bbb;
+    font-size: 1.1rem;
+    font-weight: 700;
+    letter-spacing: 2px;
+    cursor: pointer;
+    padding: 2px 6px;
+    border-radius: 4px;
+    line-height: 1;
+    transition: .15s;
+}
+.btn-subir-float:hover { color: #555; background: #f0f0f0; }
+/* Ocultar la etiqueta vacía del botón de Streamlit */
+div[data-testid="stButton"] > button[title="subir_excel_btn"] {
+    position: fixed !important;
+    top: 6px !important;
+    right: 50px !important;
+    z-index: 9999 !important;
+    background: transparent !important;
+    border: 1px solid transparent !important;
+    color: #aaa !important;
+    font-size: .9rem !important;
+    padding: 2px 7px !important;
+    border-radius: 4px !important;
+    min-height: unset !important;
+    height: 28px !important;
+    letter-spacing: 2px;
+}
+div[data-testid="stButton"] > button[title="subir_excel_btn"]:hover {
+    border-color: #bbb !important;
+    color: #555 !important;
+    background: #f5f5f5 !important;
+}
+</style>
+""", unsafe_allow_html=True)
+
+# Botón ⋯ real de Streamlit — flotante sobre el iframe
+if st.button("⋯", key="btn_abrir_panel", help="Actualizar datos desde Excel local"):
+    st.session_state["panel_subir"] = not st.session_state["panel_subir"]
     st.rerun()
 
-if st.session_state.get("panel_subir"):
+# Panel lateral
+if st.session_state["panel_subir"]:
     with st.sidebar:
-        st.markdown("### 📤 Actualizar datos en SharePoint")
+        st.markdown("## 📤 Subir Excel a SharePoint")
         st.markdown(
-            "Sube tu Excel local. Los datos desde la **fila 26, columnas A → AS** "
-            "reemplazarán la hoja **`Data`** en SharePoint (desde fila 1).",
-            unsafe_allow_html=False,
+            "Los datos desde la **fila 26, columnas A → AS** de tu archivo "
+            "reemplazarán la hoja **`Data`** en SharePoint (desde fila 1)."
         )
+        st.divider()
         archivo = st.file_uploader(
-            "Selecciona tu archivo Excel",
+            "Selecciona tu archivo Excel (.xlsx)",
             type=["xlsx", "xlsm"],
-            key="uploader_sharepoint",
+            key="uploader_sp",
         )
         col1, col2 = st.columns(2)
         with col1:
-            subir = st.button("⬆️ Subir a SharePoint", use_container_width=True)
+            if st.button("⬆️ Subir", use_container_width=True, type="primary"):
+                if archivo is None:
+                    st.warning("Primero selecciona un archivo.")
+                else:
+                    with st.spinner("Subiendo a SharePoint..."):
+                        try:
+                            msg = _subir_excel_sharepoint(archivo.read())
+                            st.success(msg)
+                            cargar_datos.clear()
+                        except Exception as e:
+                            st.error(f"❌ {e}")
         with col2:
             if st.button("✖ Cerrar", use_container_width=True):
                 st.session_state["panel_subir"] = False
                 st.rerun()
 
-        if subir:
-            if archivo is None:
-                st.warning("Primero selecciona un archivo Excel.")
-            else:
-                with st.spinner("Subiendo datos a SharePoint..."):
-                    try:
-                        resultado = _subir_excel_sharepoint(archivo.read())
-                        st.success(resultado)
-                        # Limpiar caché para que el dashboard se refresque
-                        cargar_datos.clear()
-                    except Exception as e:
-                        st.error(f"❌ Error al subir: {e}")
-
-# ── Caché del HTML: construir directamente (cache ya manejado por @st.cache_data)
+# ── Render del dashboard ──────────────────────────────────────────────────────
 html_content = build_html()
 components.html(html_content, height=1400, scrolling=True)
