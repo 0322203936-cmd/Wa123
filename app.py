@@ -1785,7 +1785,7 @@ function renderComparativo(){
 
   function semLabel(s){
     var yr = Math.floor(s/100), wk = s%100;
-    return (yr >= 2000) ? yr+'-S'+String(wk).padStart(2,'0') : 'Sem '+String(s).padStart(2,'0');
+    return (yr >= 2000) ? String(yr).slice(-2)+String(wk).padStart(2,'0') : 'Sem '+String(s).padStart(2,'0');
   }
 
   // ── SVG bar chart ─────────────────────────────────────────────────────────
