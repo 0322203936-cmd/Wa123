@@ -866,7 +866,7 @@ html,body{height:auto;overflow-y:auto}
     </div>
 
     <!-- KPI cards: totales comparados -->
-    <div id="compKpiRow" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;"></div>
+    <div id="compKpiRow" style="display:none;gap:10px;flex-wrap:wrap;margin-bottom:12px;"></div>
 
     <!-- Tabla comparativa principal -->
     <div class="box" style="overflow:auto; max-height:600px;">
@@ -1873,15 +1873,6 @@ function renderComparativo(){
 
     // KPIs: comparar 2 últimas semanas
     var kpiHTML = '';
-    if(semsAct.length >= 2){
-      var sLast = semsAct[semsAct.length-1], sPrev2 = semsAct[semsAct.length-2];
-      var mL = sumMetrics([sLast], tiendas, prods);
-      var mP = sumMetrics([sPrev2], tiendas, prods);
-      kpiHTML += kpi('Venta CFBC '+semLabel(sLast), mL.cfbc, mP.cfbc, '$');
-      kpiHTML += kpi('Unidades '+semLabel(sLast), mL.unid, mP.unid, '');
-      kpiHTML += kpi('Merma $ '+semLabel(sLast), mL.mermaR, mP.mermaR, '$');
-      kpiHTML += kpi('Embarque '+semLabel(sLast), mL.emb, mP.emb, '');
-    }
     document.getElementById('compKpiRow').innerHTML = kpiHTML;
     document.getElementById('compChart').innerHTML = buildChart(chartLabels, chartCFBC, chartMerma, 'Venta CFBC','Merma $');
 
@@ -1927,12 +1918,6 @@ function renderComparativo(){
 
     // KPIs: top tienda vs 2da tienda
     var kpiHTML2 = '';
-    if(tiendaItems.length >= 2){
-      kpiHTML2 += kpi('🥇 '+tiendaItems[0].t.replace('SC ',''), tiendaItems[0].m.cfbc, null, '$');
-      kpiHTML2 += kpi('🥈 '+tiendaItems[1].t.replace('SC ',''), tiendaItems[1].m.cfbc, null, '$');
-      var topShare = totAllT.cfbc > 0 ? Math.round(tiendaItems[0].m.cfbc/totAllT.cfbc*100) : 0;
-      kpiHTML2 += '<div style="background:#f5f8ff;border:1px solid #dde;border-radius:6px;padding:8px 14px;min-width:130px;flex:1 1 130px;"><div style="font-size:.65rem;color:#666;font-weight:600;">Tiendas Activas</div><div style="font-size:.9rem;font-weight:700;">'+tiendas.length+'</div><div style="font-size:.68rem;color:#555;">Top tienda: '+topShare+'% del total</div></div>';
-    }
     document.getElementById('compKpiRow').innerHTML = kpiHTML2;
     var chartLabels2 = tiendaItems.map(function(x){ return x.t.replace('SC ',''); });
     var chartCFBC2 = tiendaItems.map(function(x){ return x.m.cfbc; });
@@ -2004,13 +1989,6 @@ function renderComparativo(){
 
     // KPIs: top 3 products
     var kpiHTML3 = '';
-    if(prodItems3.length){
-      var top3 = prodItems3.slice(0,3);
-      top3.forEach(function(o, i){
-        var tot = o.vals.reduce(function(s,v){return s+v.cfbc;},0);
-        kpiHTML3 += kpi(['🥇','🥈','🥉'][i]+' '+o.p.replace('BQT ',''), tot, null, '$');
-      });
-    }
     document.getElementById('compKpiRow').innerHTML = kpiHTML3;
 
     // Chart: top 10 products, last sem
