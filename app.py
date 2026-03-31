@@ -882,6 +882,14 @@ html,body{height:auto;overflow-y:auto}
       <div class="box-hdr" id="compChartTitle">Gráfico Comparativo — Venta CFBC</div>
       <div id="compChart" style="padding:12px;overflow-x:auto;"></div>
     </div>
+
+    <!-- Panel drill-down: detalle al hacer clic en fila -->
+    <div id="compDrillBox" style="display:none; margin-top:10px;">
+      <div class="box" style="overflow:auto;">
+        <div class="box-hdr" id="compDrillTitle">Detalle</div>
+        <div id="compDrillContent"></div>
+      </div>
+    </div>
   </div>
 
   <!-- Vista Inventario Actual -->
@@ -1834,7 +1842,7 @@ function renderComparativo(){
   // MODO: SEMANA VS SEMANA
   // ══════════════════════════════════════════════════════════════════════════
   if(mode === 'semanas'){
-    document.getElementById('compSubtitle').textContent = 'Compara cada semana seleccionada entre sí';
+    document.getElementById('compSubtitle').textContent = 'Compara cada semana seleccionada entre sí · Clic en fila para ver detalle';
     document.getElementById('compTableTitle').textContent = 'Semana vs Semana — Totales por Período';
     document.getElementById('compChartTitle').textContent = 'Venta CFBC por Semana';
 
@@ -1847,8 +1855,8 @@ function renderComparativo(){
       var m = sumMetrics([s], tiendas, prods);
       var pctMerma = m.emb > 0 ? (m.mermaU/m.emb*100).toFixed(1)+'%' : '—';
       var vsPrev = prevCFBC !== null ? pct(m.cfbc, prevCFBC) : '—';
-      bodyHTML += '<tr>'
-        +'<td style="font-weight:600">'+semLabel(s)+'</td>'
+      bodyHTML += '<tr style="cursor:pointer" onclick="drillSemana('+s+')" title="Clic para ver detalle de tiendas y productos">'
+        +'<td style="font-weight:600;color:#0071ce">▶ '+semLabel(s)+'</td>'
         +'<td>'+fmt(m.unid)+'</td>'
         +'<td style="font-weight:700">$'+fmt(m.cfbc)+'</td>'
         +'<td>$'+fmt(m.wmx)+'</td>'
@@ -1869,17 +1877,17 @@ function renderComparativo(){
 
     document.getElementById('tCompHead').innerHTML = headHTML;
     document.getElementById('tCompBody').innerHTML = bodyHTML;
+    document.getElementById('compDrillBox').style.display = 'none';
 
-    // KPIs: comparar 2 últimas semanas
-    var kpiHTML = '';
-    document.getElementById('compKpiRow').innerHTML = kpiHTML;
+    // KPIs
+    document.getElementById('compKpiRow').innerHTML = '';
     document.getElementById('compChart').innerHTML = buildChart(chartLabels, chartCFBC, chartMerma, 'Venta CFBC','Merma $');
 
   // ══════════════════════════════════════════════════════════════════════════
   // MODO: TIENDA VS TIENDA
   // ══════════════════════════════════════════════════════════════════════════
   } else if(mode === 'tiendas'){
-    document.getElementById('compSubtitle').textContent = 'Ranking de tiendas en las semanas seleccionadas';
+    document.getElementById('compSubtitle').textContent = 'Ranking de tiendas en las semanas seleccionadas · Clic en fila para ver productos';
     document.getElementById('compTableTitle').textContent = 'Tienda vs Tienda — Período Seleccionado';
     document.getElementById('compChartTitle').textContent = 'Venta CFBC por Tienda';
 
@@ -1897,8 +1905,8 @@ function renderComparativo(){
       var m = x.m;
       var share = totAllT.cfbc > 0 ? (m.cfbc/totAllT.cfbc*100).toFixed(1) : '0.0';
       var pctM = m.emb > 0 ? (m.mermaU/m.emb*100).toFixed(1)+'%' : '—';
-      bodyHTML2 += '<tr>'
-        +'<td style="font-weight:600">'+x.t.replace('SC ','')+'</td>'
+      bodyHTML2 += '<tr style="cursor:pointer" onclick="drillTienda(\''+x.t.replace(/'/g,"\\'")+'\')" title="Clic para ver productos de esta tienda">'
+        +'<td style="font-weight:600;color:#0071ce">▶ '+x.t.replace('SC ','')+'</td>'
         +'<td>'+fmt(m.unid)+'</td>'
         +'<td style="font-weight:700">$'+fmt(m.cfbc)+'</td>'
         +'<td><div style="display:flex;align-items:center;gap:4px;"><div style="width:'+(Math.round(parseFloat(share)))+'px;max-width:80px;height:8px;background:#0071ce;border-radius:2px;"></div><span>'+share+'%</span></div></td>'
@@ -1913,10 +1921,10 @@ function renderComparativo(){
 
     document.getElementById('tCompHead').innerHTML = headHTML2;
     document.getElementById('tCompBody').innerHTML = bodyHTML2;
+    document.getElementById('compDrillBox').style.display = 'none';
 
-    // KPIs: top tienda vs 2da tienda
-    var kpiHTML2 = '';
-    document.getElementById('compKpiRow').innerHTML = kpiHTML2;
+    // KPIs
+    document.getElementById('compKpiRow').innerHTML = '';
     var chartLabels2 = tiendaItems.map(function(x){ return x.t.replace('SC ',''); });
     var chartCFBC2 = tiendaItems.map(function(x){ return x.m.cfbc; });
     var chartMerma2 = tiendaItems.map(function(x){ return x.m.mermaR; });
@@ -1926,7 +1934,7 @@ function renderComparativo(){
   // MODO: POR PRODUCTO (cada semana como columna)
   // ══════════════════════════════════════════════════════════════════════════
   } else if(mode === 'productos'){
-    document.getElementById('compSubtitle').textContent = 'Ventas y merma por producto — columna por semana seleccionada';
+    document.getElementById('compSubtitle').textContent = 'Ventas y merma por producto — columna por semana seleccionada · Clic en fila para ver tiendas';
     document.getElementById('compTableTitle').textContent = 'Por Producto — Semanas Comparadas';
     document.getElementById('compChartTitle').textContent = 'Venta CFBC por Producto';
 
@@ -1957,7 +1965,9 @@ function renderComparativo(){
 
     prodItems3.forEach(function(o){
       var pname = o.p.replace('BQT ','');
-      bodyHTML3 += '<tr><td style="font-weight:600">'+pname+'</td>';
+      var psafe = o.p.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+      bodyHTML3 += '<tr style="cursor:pointer" onclick="drillProducto(\''+psafe+'\')" title="Clic para ver tiendas de este producto">'
+        +'<td style="font-weight:600;color:#0071ce">▶ '+pname+'</td>';
       var totalVenta = 0;
       o.vals.forEach(function(v, idx){
         var s = semsAct3[idx];
@@ -1984,10 +1994,10 @@ function renderComparativo(){
 
     document.getElementById('tCompHead').innerHTML = headHTML3;
     document.getElementById('tCompBody').innerHTML = bodyHTML3;
+    document.getElementById('compDrillBox').style.display = 'none';
 
-    // KPIs: top 3 products
-    var kpiHTML3 = '';
-    document.getElementById('compKpiRow').innerHTML = kpiHTML3;
+    // KPIs
+    document.getElementById('compKpiRow').innerHTML = '';
 
     // Chart: top 10 products, last sem
     var chartItems = prodItems3.slice(0,10);
@@ -1998,6 +2008,200 @@ function renderComparativo(){
       semsAct3.length>=2 ? semLabel(semsAct3[semsAct3.length-1]) : 'Venta CFBC',
       semsAct3.length>=2 ? semLabel(semsAct3[0]) : '');
   }
+}
+
+// ─── DRILL-DOWN COMPARATIVO ──────────────────────────────────────────────────
+
+// Semana seleccionada → detalle por tienda + productos de esa tienda
+function drillSemana(s){
+  var tiendas = DATA.tiendas;
+  var prods = DATA.productos;
+  var lbl = (function(){ var yr=Math.floor(s/100),wk=s%100; return (yr>=2000)?String(yr).slice(-2)+String(wk).padStart(2,'0'):'Sem '+String(s).padStart(2,'0'); })();
+
+  // Construir tabla de tiendas con sub-tabla de productos inline
+  var html = '<div style="overflow:auto">';
+  html += '<table class="t" style="margin-bottom:0">';
+  html += '<thead><tr>'
+    +'<th style="text-align:left">Tienda</th>'
+    +'<th>Unidades</th><th>Venta CFBC</th><th>Venta WMX</th>'
+    +'<th>Embarque</th><th>Merma U</th><th>Merma $</th><th>% Merma</th>'
+    +'</tr></thead><tbody>';
+
+  var totT = {unid:0,cfbc:0,wmx:0,emb:0,mermaU:0,mermaR:0};
+  tiendas.forEach(function(t){
+    var tRow = {unid:0,cfbc:0,wmx:0,emb:0,mermaU:0,mermaR:0};
+    var prodRows = [];
+    prods.forEach(function(p){
+      var d = (DATA.raw_prod_semana&&DATA.raw_prod_semana[t]&&DATA.raw_prod_semana[t][String(s)]&&DATA.raw_prod_semana[t][String(s)][p])||{};
+      var pu = d.ventas_u||0, pc = d.venta_cfbc||0, pw = d.venta_wmx||0, pe = d.embarque_u||0, pmu = d.merma_u||0, pmr = d.retail_vc||0;
+      if(!pc && !pu && !pmu) return;
+      tRow.unid+=pu; tRow.cfbc+=pc; tRow.wmx+=pw; tRow.emb+=pe; tRow.mermaU+=pmu; tRow.mermaR+=pmr;
+      totT.unid+=pu; totT.cfbc+=pc; totT.wmx+=pw; totT.emb+=pe; totT.mermaU+=pmu; totT.mermaR+=pmr;
+      prodRows.push({p:p,pu:pu,pc:pc,pw:pw,pe:pe,pmu:pmu,pmr:pmr});
+    });
+    if(!tRow.cfbc && !tRow.unid && !tRow.mermaU) return;
+    var tid = 'drill-t-'+t.replace(/[^a-z0-9]/gi,'_');
+    var pctM = tRow.emb>0?(tRow.mermaU/tRow.emb*100).toFixed(1)+'%':'—';
+    // Fila tienda (clickeable para expandir productos)
+    html += '<tr style="cursor:pointer;background:#f0f4ff" onclick="toggleDrillT(\''+tid+'\')">'
+      +'<td style="font-weight:700;color:#0071ce">▶ '+t.replace('SC ','')+'</td>'
+      +'<td>'+Math.round(tRow.unid).toLocaleString('es-MX')+'</td>'
+      +'<td style="font-weight:700">$'+Math.round(tRow.cfbc).toLocaleString('es-MX')+'</td>'
+      +'<td>$'+Math.round(tRow.wmx).toLocaleString('es-MX')+'</td>'
+      +'<td>'+Math.round(tRow.emb).toLocaleString('es-MX')+'</td>'
+      +'<td class="'+(tRow.mermaU>0?'red':'')+'">'+Math.round(tRow.mermaU).toLocaleString('es-MX')+'</td>'
+      +'<td class="'+(tRow.mermaR>0?'red':'')+'">$'+Math.round(tRow.mermaR).toLocaleString('es-MX')+'</td>'
+      +'<td class="'+(parseFloat(pctM)>10?'red':'')+'">'+pctM+'</td>'
+      +'</tr>';
+    // Sub-filas de productos (ocultas por defecto)
+    html += '<tr id="'+tid+'" style="display:none"><td colspan="8" style="padding:0;background:#fafcff">';
+    html += '<table class="t" style="margin:0;border-top:none"><thead><tr>'
+      +'<th style="text-align:left;padding-left:24px">Producto</th>'
+      +'<th>Unidades</th><th>Venta CFBC</th><th>Venta WMX</th>'
+      +'<th>Embarque</th><th>Merma U</th><th>Merma $</th>'
+      +'</tr></thead><tbody>';
+    prodRows.sort(function(a,b){return b.pc-a.pc;}).forEach(function(pr){
+      html += '<tr>'
+        +'<td style="padding-left:24px">'+pr.p.replace('BQT ','')+'</td>'
+        +'<td>'+Math.round(pr.pu).toLocaleString('es-MX')+'</td>'
+        +'<td>$'+Math.round(pr.pc).toLocaleString('es-MX')+'</td>'
+        +'<td>$'+Math.round(pr.pw).toLocaleString('es-MX')+'</td>'
+        +'<td>'+Math.round(pr.pe).toLocaleString('es-MX')+'</td>'
+        +'<td class="'+(pr.pmu>0?'red':'')+'">'+Math.round(pr.pmu).toLocaleString('es-MX')+'</td>'
+        +'<td class="'+(pr.pmr>0?'red':'')+'">$'+Math.round(pr.pmr).toLocaleString('es-MX')+'</td>'
+        +'</tr>';
+    });
+    html += '</tbody></table></td></tr>';
+  });
+  // Fila total
+  var pctTot = totT.emb>0?(totT.mermaU/totT.emb*100).toFixed(1)+'%':'—';
+  html += '<tr class="total"><td>TOTAL</td>'
+    +'<td>'+Math.round(totT.unid).toLocaleString('es-MX')+'</td>'
+    +'<td>$'+Math.round(totT.cfbc).toLocaleString('es-MX')+'</td>'
+    +'<td>$'+Math.round(totT.wmx).toLocaleString('es-MX')+'</td>'
+    +'<td>'+Math.round(totT.emb).toLocaleString('es-MX')+'</td>'
+    +'<td class="red">'+Math.round(totT.mermaU).toLocaleString('es-MX')+'</td>'
+    +'<td class="red">$'+Math.round(totT.mermaR).toLocaleString('es-MX')+'</td>'
+    +'<td>'+pctTot+'</td></tr>';
+  html += '</tbody></table></div>';
+
+  document.getElementById('compDrillTitle').textContent = 'Detalle Semana '+lbl+' — Tiendas y Productos (clic en tienda para expandir)';
+  document.getElementById('compDrillContent').innerHTML = html;
+  document.getElementById('compDrillBox').style.display = 'block';
+  document.getElementById('compDrillBox').scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+function toggleDrillT(id){
+  var el = document.getElementById(id);
+  if(!el) return;
+  el.style.display = el.style.display === 'none' ? 'table-row' : 'none';
+}
+
+// Tienda seleccionada → productos de las semanas activas
+function drillTienda(t){
+  var sems = getSemanasActivas();
+  var prods = DATA.productos;
+  var tName = t.replace('SC ','');
+
+  var headHTML = '<tr><th style="text-align:left">Producto</th>';
+  sems.forEach(function(s){ headHTML += '<th>'+semLabel(s)+'</th>'; });
+  if(sems.length>=2) headHTML += '<th>Var.</th>';
+  headHTML += '<th>Total</th><th>Merma $</th></tr>';
+
+  var prodData = prods.map(function(p){
+    var vals = sems.map(function(s){
+      var d = (DATA.raw_prod_semana&&DATA.raw_prod_semana[t]&&DATA.raw_prod_semana[t][String(s)]&&DATA.raw_prod_semana[t][String(s)][p])||{};
+      return {cfbc:d.venta_cfbc||0, mermaR:d.retail_vc||0, unid:d.ventas_u||0};
+    });
+    return {p:p, vals:vals};
+  }).filter(function(o){ return o.vals.some(function(v){return v.cfbc||v.mermaR;}); })
+    .sort(function(a,b){
+      return b.vals.reduce(function(s,v){return s+v.cfbc;},0) - a.vals.reduce(function(s,v){return s+v.cfbc;},0);
+    });
+
+  var bodyHTML = '';
+  var totPerSem = sems.map(function(){ return 0; });
+  var totMerma = 0, grandTot = 0;
+  prodData.forEach(function(o){
+    var pname = o.p.replace('BQT ','');
+    var total = o.vals.reduce(function(s,v){return s+v.cfbc;},0);
+    var merma = o.vals.reduce(function(s,v){return s+v.mermaR;},0);
+    grandTot += total; totMerma += merma;
+    bodyHTML += '<tr><td style="font-weight:600">'+pname+'</td>';
+    o.vals.forEach(function(v,i){ totPerSem[i]+=v.cfbc; bodyHTML+='<td>$'+Math.round(v.cfbc).toLocaleString('es-MX')+'</td>'; });
+    if(sems.length>=2){
+      var f=o.vals[0].cfbc, l=o.vals[o.vals.length-1].cfbc;
+      var dv = f?((l-f)/f*100):null;
+      bodyHTML += '<td>'+(dv!==null?'<span style="color:'+(dv>=0?'#007700':'#c00')+'">'+(dv>=0?'+':'')+dv.toFixed(1)+'%</span>':'—')+'</td>';
+    }
+    bodyHTML += '<td style="font-weight:700">$'+Math.round(total).toLocaleString('es-MX')+'</td>'
+      +'<td class="'+(merma>0?'red':'')+'">$'+Math.round(merma).toLocaleString('es-MX')+'</td></tr>';
+  });
+  bodyHTML += '<tr class="total"><td>TOTAL</td>';
+  totPerSem.forEach(function(v){ bodyHTML+='<td>$'+Math.round(v).toLocaleString('es-MX')+'</td>'; });
+  if(sems.length>=2) bodyHTML+='<td>—</td>';
+  bodyHTML += '<td style="font-weight:700">$'+Math.round(grandTot).toLocaleString('es-MX')+'</td><td class="red">$'+Math.round(totMerma).toLocaleString('es-MX')+'</td></tr>';
+
+  document.getElementById('compDrillTitle').textContent = 'Detalle '+tName+' — Productos por Semana';
+  document.getElementById('compDrillContent').innerHTML = '<div style="overflow:auto"><table class="t"><thead>'+headHTML+'</thead><tbody>'+bodyHTML+'</tbody></table></div>';
+  document.getElementById('compDrillBox').style.display = 'block';
+  document.getElementById('compDrillBox').scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+// Producto seleccionado → tiendas de las semanas activas
+function drillProducto(p){
+  var sems = getSemanasActivas();
+  var tiendas = DATA.tiendas;
+  var pName = p.replace('BQT ','');
+
+  var headHTML = '<tr><th style="text-align:left">Tienda</th>';
+  sems.forEach(function(s){ headHTML += '<th>'+semLabel(s)+'</th>'; });
+  if(sems.length>=2) headHTML += '<th>Var.</th>';
+  headHTML += '<th>Total</th><th>Merma $</th></tr>';
+
+  var tiendaData = tiendas.map(function(t){
+    var vals = sems.map(function(s){
+      var d = (DATA.raw_prod_semana&&DATA.raw_prod_semana[t]&&DATA.raw_prod_semana[t][String(s)]&&DATA.raw_prod_semana[t][String(s)][p])||{};
+      return {cfbc:d.venta_cfbc||0, mermaR:d.retail_vc||0};
+    });
+    return {t:t, vals:vals};
+  }).filter(function(o){ return o.vals.some(function(v){return v.cfbc||v.mermaR;}); })
+    .sort(function(a,b){
+      return b.vals.reduce(function(s,v){return s+v.cfbc;},0) - a.vals.reduce(function(s,v){return s+v.cfbc;},0);
+    });
+
+  var bodyHTML = '';
+  var totPerSem = sems.map(function(){ return 0; });
+  var totMerma = 0, grandTot = 0;
+  tiendaData.forEach(function(o){
+    var tname = o.t.replace('SC ','');
+    var total = o.vals.reduce(function(s,v){return s+v.cfbc;},0);
+    var merma = o.vals.reduce(function(s,v){return s+v.mermaR;},0);
+    grandTot += total; totMerma += merma;
+    bodyHTML += '<tr><td style="font-weight:600">'+tname+'</td>';
+    o.vals.forEach(function(v,i){ totPerSem[i]+=v.cfbc; bodyHTML+='<td>$'+Math.round(v.cfbc).toLocaleString('es-MX')+'</td>'; });
+    if(sems.length>=2){
+      var f=o.vals[0].cfbc, l=o.vals[o.vals.length-1].cfbc;
+      var dv = f?((l-f)/f*100):null;
+      bodyHTML += '<td>'+(dv!==null?'<span style="color:'+(dv>=0?'#007700':'#c00')+'">'+(dv>=0?'+':'')+dv.toFixed(1)+'%</span>':'—')+'</td>';
+    }
+    bodyHTML += '<td style="font-weight:700">$'+Math.round(total).toLocaleString('es-MX')+'</td>'
+      +'<td class="'+(merma>0?'red':'')+'">$'+Math.round(merma).toLocaleString('es-MX')+'</td></tr>';
+  });
+  bodyHTML += '<tr class="total"><td>TOTAL</td>';
+  totPerSem.forEach(function(v){ bodyHTML+='<td>$'+Math.round(v).toLocaleString('es-MX')+'</td>'; });
+  if(sems.length>=2) bodyHTML+='<td>—</td>';
+  bodyHTML += '<td style="font-weight:700">$'+Math.round(grandTot).toLocaleString('es-MX')+'</td><td class="red">$'+Math.round(totMerma).toLocaleString('es-MX')+'</td></tr>';
+
+  document.getElementById('compDrillTitle').textContent = 'Detalle '+pName+' — Tiendas por Semana';
+  document.getElementById('compDrillContent').innerHTML = '<div style="overflow:auto"><table class="t"><thead>'+headHTML+'</thead><tbody>'+bodyHTML+'</tbody></table></div>';
+  document.getElementById('compDrillBox').style.display = 'block';
+  document.getElementById('compDrillBox').scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+function semLabel(s){
+  var yr = Math.floor(s/100), wk = s%100;
+  return (yr >= 2000) ? String(yr).slice(-2)+String(wk).padStart(2,'0') : 'Sem '+String(s).padStart(2,'0');
 }
 
 function selInvTienda(t){
