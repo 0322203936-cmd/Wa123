@@ -1813,6 +1813,17 @@ function renderComparativo(){
   var bodyRows = [];
   var prevCFBC = null;
 
+  // Detectar cuántas semanas tienen tiendas abiertas (productos expandidos)
+  var semanasConTiendasAbiertas = 0;
+  if(state.openTiendas){
+    for(var sem in state.openTiendas){
+      if(state.openTiendas[sem] && state.openTiendas[sem].length > 0){
+        semanasConTiendasAbiertas++;
+      }
+    }
+  }
+  var ocultarTiendas = (semanasConTiendasAbiertas > 1);
+
   semsAct.forEach(function(s){
     var m = sumMetrics([s], tiendas, prods);
     var pm = m.emb>0?(m.mermaU/m.emb*100).toFixed(1)+'%':'\u2014';
@@ -1852,20 +1863,23 @@ function renderComparativo(){
         var share=totT.cfbc>0?(mt.cfbc/totT.cfbc*100).toFixed(1):'0.0';
         var tOpen=(state.openTiendas && state.openTiendas[s] && state.openTiendas[s].indexOf(x.t) >= 0);
 
-        bodyRows.push('<tr class="pivot-row-tienda" style="cursor:pointer;background:'+(tOpen?'#e8f4fd':'#fff')+';border-left:3px solid #0071ce;" onclick="drillTienda('+s+',\''+(x.t).replace(/\'/g,"\\\'")+'\')">'
-          +'<td style="padding-left:22px;color:#0071ce;">'
-          +'<span style="font-size:.75rem;margin-right:4px;">'+(tOpen?'\u25bc':'\u25b6')+'</span>'
-          +x.t.replace('SC ','')
-          +'<span style="margin-left:5px;font-size:.65rem;color:#888;">'+share+'%</span>'
-          +'</td>'
-          +'<td>'+fmt(mt.unid)+'</td>'
-          +'<td style="font-weight:600">$'+fmt(mt.cfbc)+'</td>'
-          +'<td>$'+fmt(mt.wmx)+'</td>'
-          +'<td class="'+(mt.mermaU>0?'red':'')+'">'+fmt(mt.mermaU)+'</td>'
-          +'<td class="'+(mt.mermaR>0?'red':'')+'">$'+fmt(mt.mermaR)+'</td>'
-          +'<td>'+fmt(mt.emb)+'</td>'
-          +'<td class="'+(parseFloat(pm2)>10?'red':'')+'">'+pm2+'</td>'
-          +'<td></td></tr>');
+        // Solo mostrar fila de tienda si NO estamos ocultando tiendas
+        if(!ocultarTiendas){
+          bodyRows.push('<tr class="pivot-row-tienda" style="cursor:pointer;background:'+(tOpen?'#e8f4fd':'#fff')+';border-left:3px solid #0071ce;" onclick="drillTienda('+s+',\''+(x.t).replace(/\'/g,"\\\'")+'\')">'
+            +'<td style="padding-left:22px;color:#0071ce;">'
+            +'<span style="font-size:.75rem;margin-right:4px;">'+(tOpen?'\u25bc':'\u25b6')+'</span>'
+            +x.t.replace('SC ','')
+            +'<span style="margin-left:5px;font-size:.65rem;color:#888;">'+share+'%</span>'
+            +'</td>'
+            +'<td>'+fmt(mt.unid)+'</td>'
+            +'<td style="font-weight:600">$'+fmt(mt.cfbc)+'</td>'
+            +'<td>$'+fmt(mt.wmx)+'</td>'
+            +'<td class="'+(mt.mermaU>0?'red':'')+'">'+fmt(mt.mermaU)+'</td>'
+            +'<td class="'+(mt.mermaR>0?'red':'')+'">$'+fmt(mt.mermaR)+'</td>'
+            +'<td>'+fmt(mt.emb)+'</td>'
+            +'<td class="'+(parseFloat(pm2)>10?'red':'')+'">'+pm2+'</td>'
+            +'<td></td></tr>');
+        }
 
         if(tOpen){
           var prodItems = prods.map(function(p){
@@ -1880,8 +1894,10 @@ function renderComparativo(){
 
           prodItems.forEach(function(o){
             var sharep=totP.cfbc>0?(o.cfbc/totP.cfbc*100).toFixed(1):'0.0';
+            // Agregar identificador de semana cuando se ocultan tiendas
+            var semIdentifier = ocultarTiendas ? ' <span style="color:#0071ce;font-weight:600;">['+semLabel(s)+' → '+x.t.replace('SC ','')+']</span>' : '';
             bodyRows.push('<tr class="pivot-row-prod" style="background:#f0f8ff;border-left:6px solid #5bc0de;">'
-              +'<td style="padding-left:40px;font-size:.68rem;color:#333;">'+o.p.replace('BQT ','')
+              +'<td style="padding-left:40px;font-size:.68rem;color:#333;">'+o.p.replace('BQT ','')+semIdentifier
               +'<span style="margin-left:4px;font-size:.62rem;color:#999;">'+sharep+'%</span></td>'
               +'<td style="font-size:.68rem">'+fmt(o.unid)+'</td>'
               +'<td style="font-weight:600;font-size:.68rem">$'+fmt(o.cfbc)+'</td>'
@@ -1892,11 +1908,14 @@ function renderComparativo(){
               +'<td></td><td></td></tr>');
           });
 
-          bodyRows.push('<tr style="background:#daeaf5;border-left:6px solid #5bc0de;font-weight:700;font-size:.68rem;">'
-            +'<td style="padding-left:40px;color:#0071ce;">Subtotal '+x.t.replace('SC ','')+'</td>'
-            +'<td>'+fmt(totP.unid)+'</td><td>$'+fmt(totP.cfbc)+'</td><td>$'+fmt(totP.wmx)+'</td>'
-            +'<td class="red">'+fmt(totP.mermaU)+'</td><td class="red">$'+fmt(totP.mermaR)+'</td>'
-            +'<td>'+fmt(totP.emb)+'</td><td></td><td></td></tr>');
+          // Solo mostrar subtotal de tienda si NO estamos ocultando tiendas
+          if(!ocultarTiendas){
+            bodyRows.push('<tr style="background:#daeaf5;border-left:6px solid #5bc0de;font-weight:700;font-size:.68rem;">'
+              +'<td style="padding-left:40px;color:#0071ce;">Subtotal '+x.t.replace('SC ','')+'</td>'
+              +'<td>'+fmt(totP.unid)+'</td><td>$'+fmt(totP.cfbc)+'</td><td>$'+fmt(totP.wmx)+'</td>'
+              +'<td class="red">'+fmt(totP.mermaU)+'</td><td class="red">$'+fmt(totP.mermaR)+'</td>'
+              +'<td>'+fmt(totP.emb)+'</td><td></td><td></td></tr>');
+          }
         }
       });
 
