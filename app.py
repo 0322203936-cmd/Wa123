@@ -1813,16 +1813,16 @@ function renderComparativo(){
   var bodyRows = [];
   var prevCFBC = null;
 
-  // Detectar cuántas semanas tienen tiendas abiertas (productos expandidos)
-  var semanasConTiendasAbiertas = 0;
+  // Detectar cuántas tiendas en total están abiertas (productos expandidos)
+  var totalTiendasAbiertas = 0;
   if(state.openTiendas){
     for(var sem in state.openTiendas){
       if(state.openTiendas[sem] && state.openTiendas[sem].length > 0){
-        semanasConTiendasAbiertas++;
+        totalTiendasAbiertas += state.openTiendas[sem].length;
       }
     }
   }
-  var ocultarTiendas = (semanasConTiendasAbiertas > 1);
+  var ocultarTiendas = (totalTiendasAbiertas > 1);
 
   semsAct.forEach(function(s){
     var m = sumMetrics([s], tiendas, prods);
