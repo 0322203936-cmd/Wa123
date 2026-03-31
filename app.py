@@ -856,16 +856,26 @@ html,body{height:auto;overflow-y:auto}
   <!-- Vista COMPARATIVO -->
   <div id="viewComparativo" style="display:none; padding:10px 16px; overflow:visible !important; height:auto !important;">
 
-    <!-- Tabla dinámica pivot única -->
-    <div class="box" style="overflow:auto;">
-      <div class="box-hdr" id="compTableTitle">Comparativo — clic en semana para ver tiendas · clic en tienda para ver productos</div>
-      <table class="t" id="tComp">
-        <thead id="tCompHead"></thead>
-        <tbody id="tCompBody"></tbody>
-      </table>
+    <!-- Layout: tabla pivot izquierda | gráfica derecha -->
+    <div style="display:flex; gap:10px; align-items:flex-start; flex-wrap:wrap;">
+
+      <!-- Columna izquierda: tabla pivot -->
+      <div class="box" style="flex:1 1 420px; overflow:auto; min-width:320px;">
+        <div class="box-hdr" id="compTableTitle">Comparativo — ▶ semana → tiendas → productos</div>
+        <table class="t" id="tComp">
+          <thead id="tCompHead"></thead>
+          <tbody id="tCompBody"></tbody>
+        </table>
+      </div>
+
+      <!-- Columna derecha: gráfica dinámica -->
+      <div class="box" style="flex:1 1 300px; overflow:visible; min-width:240px;">
+        <div class="box-hdr" id="compChartTitle">Venta CFBC por Semana</div>
+        <div id="compChart" style="padding:8px; overflow-x:auto;"></div>
+      </div>
     </div>
 
-    <!-- IDs fantasma para compatibilidad con código antiguo (no se muestran) -->
+    <!-- IDs fantasma para compatibilidad -->
     <div style="display:none">
       <div id="compDrillBox"></div>
       <div id="compDrillTitle"></div>
@@ -876,8 +886,6 @@ html,body{height:auto;overflow-y:auto}
       <div id="drillProdTitle"></div>
       <table><thead id="tDrillProdHead"></thead><tbody id="tDrillProdBody"></tbody></table>
       <div id="drillChartProd"></div>
-      <div id="compChart"></div>
-      <div id="compChartTitle"></div>
       <div id="compChartBox"></div>
       <div id="drillChartTiendaBox"></div>
     </div>
@@ -1910,6 +1918,37 @@ function renderComparativo(){
 
   document.getElementById('tCompHead').innerHTML = headHTML;
   document.getElementById('tCompBody').innerHTML = bodyRows.join('');
+
+  // ── Gráfica lateral: actualiza según nivel activo ──────────────────────────
+  var chartEl   = document.getElementById('compChart');
+  var chartTitle = document.getElementById('compChartTitle');
+  var tiendas = DATA.tiendas; var prods = DATA.productos;
+
+  if(state.drillTienda && state.drillSem){
+    // Nivel productos: gráfica de productos de la tienda
+    var s2=state.drillSem; var t2=state.drillTienda;
+    var pi=prods.map(function(p){
+      var d=(DATA.raw_prod_semana&&DATA.raw_prod_semana[t2]&&DATA.raw_prod_semana[t2][String(s2)]&&DATA.raw_prod_semana[t2][String(s2)][p])||{};
+      return {p:p,cfbc:d.venta_cfbc||0,mermaR:d.retail_vc||0};
+    }).filter(function(o){return o.cfbc;}).sort(function(a,b){return b.cfbc-a.cfbc;});
+    chartTitle.textContent='CFBC por Producto — '+t2.replace('SC ','');
+    chartEl.innerHTML=buildBarChart(pi.map(function(o){return o.p.replace('BQT ','');}),pi.map(function(o){return o.cfbc;}),pi.map(function(o){return o.mermaR;}),'Venta CFBC','Merma $',320,150);
+
+  } else if(state.drillSem){
+    // Nivel tiendas: gráfica de tiendas de la semana activa
+    var s3=state.drillSem;
+    var ti=tiendas.map(function(t){var mt=sumMetrics([s3],[t],prods);return {t:t,cfbc:mt.cfbc,mermaR:mt.mermaR};})
+      .filter(function(x){return x.cfbc;}).sort(function(a,b){return b.cfbc-a.cfbc;});
+    chartTitle.textContent='CFBC por Tienda — Sem '+semLabel(s3);
+    chartEl.innerHTML=buildBarChart(ti.map(function(x){return x.t.replace('SC ','');}),ti.map(function(x){return x.cfbc;}),ti.map(function(x){return x.mermaR;}),'Venta CFBC','Merma $',320,150);
+
+  } else {
+    // Nivel semanas: gráfica de todas las semanas activas
+    var chartLabels=[],chartCFBC=[],chartMerma=[];
+    semsAct.forEach(function(s){var m=sumMetrics([s],tiendas,prods);chartLabels.push(semLabel(s));chartCFBC.push(m.cfbc);chartMerma.push(m.mermaR);});
+    chartTitle.textContent='Venta CFBC por Semana';
+    chartEl.innerHTML=buildBarChart(chartLabels,chartCFBC,chartMerma,'Venta CFBC','Merma $',320,160);
+  }
 }
 
 function drillSemana(s){
