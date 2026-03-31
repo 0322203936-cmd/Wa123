@@ -1857,14 +1857,18 @@ function renderComparativo(){
                 mermaU:acc.mermaU+x.m.mermaU,mermaR:acc.mermaR+x.m.mermaR,emb:acc.emb+x.m.emb};
       },{cfbc:0,wmx:0,unid:0,mermaU:0,mermaR:0,emb:0});
 
-      tiendaItems.forEach(function(x){
+      // Cuando ocultarTiendas: solo iterar las tiendas que están abiertas
+      var tiendaItemsRender = ocultarTiendas
+        ? tiendaItems.filter(function(x){
+            return state.openTiendas && state.openTiendas[s] && state.openTiendas[s].indexOf(x.t) >= 0;
+          })
+        : tiendaItems;
+
+      tiendaItemsRender.forEach(function(x){
         var mt=x.m;
         var pm2=mt.emb>0?(mt.mermaU/mt.emb*100).toFixed(1)+'%':'\u2014';
         var share=totT.cfbc>0?(mt.cfbc/totT.cfbc*100).toFixed(1):'0.0';
         var tOpen=(state.openTiendas && state.openTiendas[s] && state.openTiendas[s].indexOf(x.t) >= 0);
-
-        // Cuando ocultarTiendas: saltar completamente tiendas que NO están abiertas
-        if(ocultarTiendas && !tOpen) return;
 
         // Solo mostrar fila de tienda si NO estamos ocultando tiendas
         if(!ocultarTiendas){
