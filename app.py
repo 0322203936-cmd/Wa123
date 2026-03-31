@@ -1840,7 +1840,7 @@ function renderComparativo(){
 
     var semsAct = sems.length ? sems : DATA.semanas.slice(-4);
     var chartLabels=[], chartCFBC=[], chartMerma=[];
-    var headHTML = '<tr><th style="text-align:left">Semana</th><th># Tiendas</th><th>Unidades</th><th>Venta CFBC</th><th>Venta WMX</th><th>Merma U</th><th>Merma $</th><th>Embarque</th><th>% Merma</th><th>vs Sem Ant.</th></tr>';
+    var headHTML = '<tr><th style="text-align:left">Semana</th><th>Unidades</th><th>Venta CFBC</th><th>Venta WMX</th><th>Merma U</th><th>Merma $</th><th>Embarque</th><th>% Merma</th><th>vs Sem Ant.</th></tr>';
     var bodyHTML = '';
     var prevCFBC = null;
     semsAct.forEach(function(s){
@@ -1849,7 +1849,6 @@ function renderComparativo(){
       var vsPrev = prevCFBC !== null ? pct(m.cfbc, prevCFBC) : '—';
       bodyHTML += '<tr>'
         +'<td style="font-weight:600">'+semLabel(s)+'</td>'
-        +'<td>'+tiendas.length+'</td>'
         +'<td>'+fmt(m.unid)+'</td>'
         +'<td style="font-weight:700">$'+fmt(m.cfbc)+'</td>'
         +'<td>$'+fmt(m.wmx)+'</td>'
@@ -1866,7 +1865,7 @@ function renderComparativo(){
     });
     // totals row
     var totAll = sumMetrics(semsAct, tiendas, prods);
-    bodyHTML += '<tr class="total"><td>TOTAL</td><td></td><td>'+fmt(totAll.unid)+'</td><td>$'+fmt(totAll.cfbc)+'</td><td>$'+fmt(totAll.wmx)+'</td><td class="red">'+fmt(totAll.mermaU)+'</td><td class="red">$'+fmt(totAll.mermaR)+'</td><td>'+fmt(totAll.emb)+'</td><td></td><td></td></tr>';
+    bodyHTML += '<tr class="total"><td>TOTAL</td><td>'+fmt(totAll.unid)+'</td><td>$'+fmt(totAll.cfbc)+'</td><td>$'+fmt(totAll.wmx)+'</td><td class="red">'+fmt(totAll.mermaU)+'</td><td class="red">$'+fmt(totAll.mermaR)+'</td><td>'+fmt(totAll.emb)+'</td><td></td><td></td></tr>';
 
     document.getElementById('tCompHead').innerHTML = headHTML;
     document.getElementById('tCompBody').innerHTML = bodyHTML;
