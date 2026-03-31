@@ -1891,14 +1891,13 @@ function renderComparativo(){
 
     var totAllT = tiendaItems.reduce(function(acc,x){ return {cfbc:acc.cfbc+x.m.cfbc,wmx:acc.wmx+x.m.wmx,unid:acc.unid+x.m.unid,mermaU:acc.mermaU+x.m.mermaU,mermaR:acc.mermaR+x.m.mermaR,emb:acc.emb+x.m.emb}; },{cfbc:0,wmx:0,unid:0,mermaU:0,mermaR:0,emb:0});
 
-    var headHTML2 = '<tr><th>#</th><th style="text-align:left">Tienda</th><th>Unidades</th><th>Venta CFBC</th><th>% del Total</th><th>Venta WMX</th><th>Embarque</th><th>Merma U</th><th>Merma $</th><th>% Merma</th></tr>';
+    var headHTML2 = '<tr><th style="text-align:left">Tienda</th><th>Unidades</th><th>Venta CFBC</th><th>% del Total</th><th>Venta WMX</th><th>Embarque</th><th>Merma U</th><th>Merma $</th><th>% Merma</th></tr>';
     var bodyHTML2 = '';
     tiendaItems.forEach(function(x, idx){
       var m = x.m;
       var share = totAllT.cfbc > 0 ? (m.cfbc/totAllT.cfbc*100).toFixed(1) : '0.0';
       var pctM = m.emb > 0 ? (m.mermaU/m.emb*100).toFixed(1)+'%' : '—';
       bodyHTML2 += '<tr>'
-        +'<td style="color:#888;">'+( idx+1)+'</td>'
         +'<td style="font-weight:600">'+x.t.replace('SC ','')+'</td>'
         +'<td>'+fmt(m.unid)+'</td>'
         +'<td style="font-weight:700">$'+fmt(m.cfbc)+'</td>'
@@ -1910,7 +1909,7 @@ function renderComparativo(){
         +'<td class="'+(parseFloat(pctM)>10?'red':'')+'">'+pctM+'</td>'
         +'</tr>';
     });
-    bodyHTML2 += '<tr class="total"><td></td><td>TOTAL</td><td>'+fmt(totAllT.unid)+'</td><td>$'+fmt(totAllT.cfbc)+'</td><td>100%</td><td>$'+fmt(totAllT.wmx)+'</td><td>'+fmt(totAllT.emb)+'</td><td class="red">'+fmt(totAllT.mermaU)+'</td><td class="red">$'+fmt(totAllT.mermaR)+'</td><td></td></tr>';
+    bodyHTML2 += '<tr class="total"><td>TOTAL</td><td>'+fmt(totAllT.unid)+'</td><td>$'+fmt(totAllT.cfbc)+'</td><td>100%</td><td>$'+fmt(totAllT.wmx)+'</td><td>'+fmt(totAllT.emb)+'</td><td class="red">'+fmt(totAllT.mermaU)+'</td><td class="red">$'+fmt(totAllT.mermaR)+'</td><td></td></tr>';
 
     document.getElementById('tCompHead').innerHTML = headHTML2;
     document.getElementById('tCompBody').innerHTML = bodyHTML2;
