@@ -1814,12 +1814,14 @@ function renderComparativo(){
   var prevCFBC = null;
 
   // Detectar cuántas tiendas en total están abiertas (productos expandidos)
-  // ocultarTiendas = true cuando TODAS las semanas abiertas tienen al menos 1 tienda abierta
+  // ocultarTiendas = true solo cuando todas las semanas abiertas tienen el MISMO numero de tiendas (1-1, 2-2, 3-3...)
   var ocultarTiendas = false;
   if(state.openSemanas && state.openSemanas.length > 0 && state.openTiendas){
-    ocultarTiendas = state.openSemanas.every(function(sem){
-      return state.openTiendas[sem] && state.openTiendas[sem].length > 0;
+    var counts = state.openSemanas.map(function(sem){
+      return (state.openTiendas[sem] && state.openTiendas[sem].length) || 0;
     });
+    var allSame = counts.every(function(c){ return c === counts[0]; });
+    ocultarTiendas = allSame && counts[0] >= 1;
   }
 
   semsAct.forEach(function(s){
