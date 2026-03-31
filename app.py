@@ -869,9 +869,9 @@ html,body{height:auto;overflow-y:auto}
     <div id="compKpiRow" style="display:none;gap:10px;flex-wrap:wrap;margin-bottom:12px;"></div>
 
     <!-- Tabla comparativa principal -->
-    <div class="box" style="overflow:visible;">
+    <div class="box" style="overflow:auto; max-height:600px;">
       <div class="box-hdr" id="compTableTitle">Comparativo</div>
-      <table class="t" id="tComp" style="width:100%;">
+      <table class="t" id="tComp">
         <thead id="tCompHead"></thead>
         <tbody id="tCompBody"></tbody>
       </table>
@@ -880,7 +880,7 @@ html,body{height:auto;overflow-y:auto}
     <!-- Gráfico de barras SVG -->
     <div class="box" style="margin-top:10px;overflow:visible;height:auto;" id="compChartBox">
       <div class="box-hdr" id="compChartTitle">Gráfico Comparativo — Venta CFBC</div>
-      <div id="compChart" style="padding:12px;overflow:visible;"></div>
+      <div id="compChart" style="padding:12px;overflow-x:auto;"></div>
     </div>
   </div>
 
@@ -1794,7 +1794,7 @@ function renderComparativo(){
     var H = 200;
     var maxV = Math.max.apply(null, values1.concat(values2).concat([1]));
     var barW = 24, gap = (W - 60) / labels.length - barW*2 - 4;
-    var html = '<svg viewBox="0 0 '+W+' '+(H+60)+'" width="100%" style="display:block;" font-family="Arial" font-size="10">';
+    var html = '<svg width="'+W+'" height="'+(H+60)+'" font-family="Arial" font-size="10">';
     // axes
     html += '<line x1="50" y1="10" x2="50" y2="'+H+'" stroke="#bbb"/>';
     html += '<line x1="50" y1="'+H+'" x2="'+W+'" y2="'+H+'" stroke="#bbb"/>';
@@ -2194,6 +2194,15 @@ window.addEventListener('load', init);
     if(typeof renderTienda!=='undefined') renderTienda = _patchResize(renderTienda);
   });
 })();
+
+// ── Auto-resize: reporta altura real al iframe padre de Streamlit ──
+function resizeIframe(){
+  var h = document.body.scrollHeight;
+  window.parent.postMessage({type:'streamlit:setFrameHeight', height: h}, '*');
+}
+var _resizeObs = new ResizeObserver(function(){ resizeIframe(); });
+_resizeObs.observe(document.body);
+window.addEventListener('load', resizeIframe);
 </script>
 </body>
 </html>"""
@@ -2415,4 +2424,4 @@ with st.expander("⠀"):
 
 # ── Render del dashboard ──────────────────────────────────────────────────────
 html_content = build_html()
-components.html(html_content, height=1400, scrolling=True)
+components.html(html_content, height=1400, scrolling=False)
