@@ -1813,7 +1813,7 @@ function renderComparativo(){
   var bodyRows = [];
   var prevCFBC = null;
 
-  // Detectar máx tiendas abiertas en cualquier semana (para comparativo 1-1, 2-2, etc.)
+  // Detectar cuántas tiendas en total están abiertas (productos expandidos)
   var maxTiendasPorSemana = 0;
   if(state.openTiendas){
     for(var sem in state.openTiendas){
@@ -1857,7 +1857,7 @@ function renderComparativo(){
                 mermaU:acc.mermaU+x.m.mermaU,mermaR:acc.mermaR+x.m.mermaR,emb:acc.emb+x.m.emb};
       },{cfbc:0,wmx:0,unid:0,mermaU:0,mermaR:0,emb:0});
 
-      // Cuando ocultarTiendas: solo iterar las tiendas que están abiertas
+      // Solo renderizar tiendas abiertas cuando ocultarTiendas=true
       var tiendaItemsRender = ocultarTiendas
         ? tiendaItems.filter(function(x){
             return state.openTiendas && state.openTiendas[s] && state.openTiendas[s].indexOf(x.t) >= 0;
@@ -2022,22 +2022,18 @@ function drillSemana(s){
 }
 
 function drillTienda(s,t){
-  // Toggle tienda en la semana clickeada, luego sincronizar el MISMO conjunto
-  // de tiendas en todas las demas semanas abiertas (comparativo 1-1, 2-2, etc.)
   if(!state.openTiendas) state.openTiendas = {};
   if(!state.openTiendas[s]) state.openTiendas[s] = [];
 
   var idx = state.openTiendas[s].indexOf(t);
   if(idx >= 0){
     state.openTiendas[s].splice(idx, 1);
-    if(state.openTiendas[s].length === 0){
-      delete state.openTiendas[s];
-    }
+    if(state.openTiendas[s].length === 0) delete state.openTiendas[s];
   } else {
     state.openTiendas[s].push(t);
   }
 
-  // Sincronizar el mismo listado de tiendas en todas las semanas abiertas
+  // Sincronizar mismo listado en todas las demas semanas abiertas
   var tiendasRef = state.openTiendas[s] ? state.openTiendas[s].slice() : [];
   if(state.openSemanas){
     state.openSemanas.forEach(function(sem){
@@ -2049,7 +2045,6 @@ function drillTienda(s,t){
       }
     });
   }
-
   renderComparativo();
 }
 
