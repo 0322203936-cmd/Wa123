@@ -1863,6 +1863,9 @@ function renderComparativo(){
         var share=totT.cfbc>0?(mt.cfbc/totT.cfbc*100).toFixed(1):'0.0';
         var tOpen=(state.openTiendas && state.openTiendas[s] && state.openTiendas[s].indexOf(x.t) >= 0);
 
+        // Cuando ocultarTiendas: saltar completamente tiendas que NO están abiertas
+        if(ocultarTiendas && !tOpen) return;
+
         // Solo mostrar fila de tienda si NO estamos ocultando tiendas
         if(!ocultarTiendas){
           bodyRows.push('<tr class="pivot-row-tienda" style="cursor:pointer;background:'+(tOpen?'#e8f4fd':'#fff')+';border-left:3px solid #0071ce;" onclick="drillTienda('+s+',\''+(x.t).replace(/\'/g,"\\\'")+'\')">'
