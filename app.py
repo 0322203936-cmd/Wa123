@@ -1813,16 +1813,16 @@ function renderComparativo(){
   var bodyRows = [];
   var prevCFBC = null;
 
-  // Detectar cuántas tiendas en total están abiertas (productos expandidos)
-  var totalTiendasAbiertas = 0;
+  // Detectar máx tiendas abiertas en cualquier semana (para comparativo 1-1, 2-2, etc.)
+  var maxTiendasPorSemana = 0;
   if(state.openTiendas){
     for(var sem in state.openTiendas){
-      if(state.openTiendas[sem] && state.openTiendas[sem].length > 0){
-        totalTiendasAbiertas += state.openTiendas[sem].length;
+      if(state.openTiendas[sem] && state.openTiendas[sem].length > maxTiendasPorSemana){
+        maxTiendasPorSemana = state.openTiendas[sem].length;
       }
     }
   }
-  var ocultarTiendas = (totalTiendasAbiertas > 1);
+  var ocultarTiendas = (maxTiendasPorSemana > 1);
 
   semsAct.forEach(function(s){
     var m = sumMetrics([s], tiendas, prods);
@@ -2015,20 +2015,34 @@ function drillSemana(s){
 }
 
 function drillTienda(s,t){
-  // Cambiar a objeto anidado para permitir múltiples tiendas abiertas por semana
+  // Toggle tienda en la semana clickeada, luego sincronizar el MISMO conjunto
+  // de tiendas en todas las demas semanas abiertas (comparativo 1-1, 2-2, etc.)
   if(!state.openTiendas) state.openTiendas = {};
   if(!state.openTiendas[s]) state.openTiendas[s] = [];
-  
+
   var idx = state.openTiendas[s].indexOf(t);
   if(idx >= 0){
-    state.openTiendas[s].splice(idx, 1); // Cerrar esta tienda
-    // Limpiar la semana si ya no tiene tiendas abiertas
+    state.openTiendas[s].splice(idx, 1);
     if(state.openTiendas[s].length === 0){
       delete state.openTiendas[s];
     }
   } else {
-    state.openTiendas[s].push(t); // Abrir esta tienda
+    state.openTiendas[s].push(t);
   }
+
+  // Sincronizar el mismo listado de tiendas en todas las semanas abiertas
+  var tiendasRef = state.openTiendas[s] ? state.openTiendas[s].slice() : [];
+  if(state.openSemanas){
+    state.openSemanas.forEach(function(sem){
+      if(sem === s) return;
+      if(tiendasRef.length === 0){
+        delete state.openTiendas[sem];
+      } else {
+        state.openTiendas[sem] = tiendasRef.slice();
+      }
+    });
+  }
+
   renderComparativo();
 }
 
