@@ -1817,7 +1817,7 @@ function renderComparativo(){
     var m = sumMetrics([s], tiendas, prods);
     var pm = m.emb>0?(m.mermaU/m.emb*100).toFixed(1)+'%':'\u2014';
     var vs = prevCFBC!==null ? pctSpan(m.cfbc,prevCFBC) : '\u2014';
-    var semOpen = (state.drillSem===s);
+    var semOpen = (state.openSemanas && state.openSemanas.indexOf(s) >= 0);
 
     bodyRows.push('<tr class="pivot-row-sem" style="cursor:pointer;background:'+(semOpen?'#cce5ff':'#f5f7fa')+';font-weight:700;" onclick="drillSemana('+s+')">'
       +'<td style="padding-left:6px;color:#0071ce;">'
@@ -1850,7 +1850,7 @@ function renderComparativo(){
         var mt=x.m;
         var pm2=mt.emb>0?(mt.mermaU/mt.emb*100).toFixed(1)+'%':'\u2014';
         var share=totT.cfbc>0?(mt.cfbc/totT.cfbc*100).toFixed(1):'0.0';
-        var tOpen=(state.drillTienda===x.t && state.drillSem===s);
+        var tOpen=(state.openTiendas && state.openTiendas[s] && state.openTiendas[s].indexOf(x.t) >= 0);
 
         bodyRows.push('<tr class="pivot-row-tienda" style="cursor:pointer;background:'+(tOpen?'#e8f4fd':'#fff')+';border-left:3px solid #0071ce;" onclick="drillTienda('+s+',\''+(x.t).replace(/\'/g,"\\\'")+'\')">'
           +'<td style="padding-left:22px;color:#0071ce;">'
@@ -1924,9 +1924,22 @@ function renderComparativo(){
   var chartTitle = document.getElementById('compChartTitle');
   var tiendas = DATA.tiendas; var prods = DATA.productos;
 
-  if(state.drillTienda && state.drillSem){
-    // Nivel productos: gráfica de productos de la tienda
-    var s2=state.drillSem; var t2=state.drillTienda;
+  // Obtener la primera tienda abierta (si hay alguna)
+  var firstOpenSem = null;
+  var firstOpenTienda = null;
+  if(state.openTiendas){
+    for(var sem in state.openTiendas){
+      if(state.openTiendas[sem] && state.openTiendas[sem].length > 0){
+        firstOpenSem = parseInt(sem);
+        firstOpenTienda = state.openTiendas[sem][0];
+        break;
+      }
+    }
+  }
+
+  if(firstOpenTienda && firstOpenSem){
+    // Nivel productos: gráfica de productos de la primera tienda abierta
+    var s2=firstOpenSem; var t2=firstOpenTienda;
     var pi=prods.map(function(p){
       var d=(DATA.raw_prod_semana&&DATA.raw_prod_semana[t2]&&DATA.raw_prod_semana[t2][String(s2)]&&DATA.raw_prod_semana[t2][String(s2)][p])||{};
       return {p:p,cfbc:d.venta_cfbc||0,mermaR:d.retail_vc||0};
@@ -1934,9 +1947,9 @@ function renderComparativo(){
     chartTitle.textContent='CFBC por Producto — '+t2.replace('SC ','');
     chartEl.innerHTML=buildBarChart(pi.map(function(o){return o.p.replace('BQT ','');}),pi.map(function(o){return o.cfbc;}),pi.map(function(o){return o.mermaR;}),'Venta CFBC','Merma $',320,150);
 
-  } else if(state.drillSem){
-    // Nivel tiendas: gráfica de tiendas de la semana activa
-    var s3=state.drillSem;
+  } else if(state.openSemanas && state.openSemanas.length > 0){
+    // Nivel tiendas: gráfica de tiendas de la primera semana abierta
+    var s3=state.openSemanas[0];
     var ti=tiendas.map(function(t){var mt=sumMetrics([s3],[t],prods);return {t:t,cfbc:mt.cfbc,mermaR:mt.mermaR};})
       .filter(function(x){return x.cfbc;}).sort(function(a,b){return b.cfbc-a.cfbc;});
     chartTitle.textContent='CFBC por Tienda — Sem '+semLabel(s3);
@@ -1952,18 +1965,36 @@ function renderComparativo(){
 }
 
 function drillSemana(s){
-  if(state.drillSem===s){ state.drillSem=null; state.drillTienda=null; }
-  else { state.drillSem=s; state.drillTienda=null; }
+  // Cambiar a array para permitir múltiples semanas abiertas
+  if(!state.openSemanas) state.openSemanas = [];
+  var idx = state.openSemanas.indexOf(s);
+  if(idx >= 0){
+    state.openSemanas.splice(idx, 1); // Cerrar esta semana
+  } else {
+    state.openSemanas.push(s); // Abrir esta semana
+  }
   renderComparativo();
 }
 
 function drillTienda(s,t){
-  if(state.drillTienda===t && state.drillSem===s){ state.drillTienda=null; }
-  else { state.drillSem=s; state.drillTienda=t; }
+  // Cambiar a objeto anidado para permitir múltiples tiendas abiertas por semana
+  if(!state.openTiendas) state.openTiendas = {};
+  if(!state.openTiendas[s]) state.openTiendas[s] = [];
+  
+  var idx = state.openTiendas[s].indexOf(t);
+  if(idx >= 0){
+    state.openTiendas[s].splice(idx, 1); // Cerrar esta tienda
+  } else {
+    state.openTiendas[s].push(t); // Abrir esta tienda
+  }
   renderComparativo();
 }
 
-function cerrarDrill(){ state.drillSem=null; state.drillTienda=null; renderComparativo(); }
+function cerrarDrill(){ 
+  state.openSemanas = []; 
+  state.openTiendas = {}; 
+  renderComparativo(); 
+}
 function _renderDrillTiendas(s){ /* integrado en renderComparativo */ }
 function _renderDrillProductos(s,t){ /* integrado en renderComparativo */ }
 
