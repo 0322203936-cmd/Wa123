@@ -1814,15 +1814,13 @@ function renderComparativo(){
   var prevCFBC = null;
 
   // Detectar cuántas tiendas en total están abiertas (productos expandidos)
-  var maxTiendasPorSemana = 0;
-  if(state.openTiendas){
-    for(var sem in state.openTiendas){
-      if(state.openTiendas[sem] && state.openTiendas[sem].length > maxTiendasPorSemana){
-        maxTiendasPorSemana = state.openTiendas[sem].length;
-      }
-    }
+  // ocultarTiendas = true cuando TODAS las semanas abiertas tienen al menos 1 tienda abierta
+  var ocultarTiendas = false;
+  if(state.openSemanas && state.openSemanas.length > 0 && state.openTiendas){
+    ocultarTiendas = state.openSemanas.every(function(sem){
+      return state.openTiendas[sem] && state.openTiendas[sem].length > 0;
+    });
   }
-  var ocultarTiendas = (maxTiendasPorSemana > 1);
 
   semsAct.forEach(function(s){
     var m = sumMetrics([s], tiendas, prods);
@@ -2033,18 +2031,6 @@ function drillTienda(s,t){
     state.openTiendas[s].push(t);
   }
 
-  // Sincronizar mismo listado en todas las demas semanas abiertas
-  var tiendasRef = state.openTiendas[s] ? state.openTiendas[s].slice() : [];
-  if(state.openSemanas){
-    state.openSemanas.forEach(function(sem){
-      if(sem === s) return;
-      if(tiendasRef.length === 0){
-        delete state.openTiendas[sem];
-      } else {
-        state.openTiendas[sem] = tiendasRef.slice();
-      }
-    });
-  }
   renderComparativo();
 }
 
