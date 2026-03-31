@@ -2003,6 +2003,10 @@ function drillTienda(s,t){
   var idx = state.openTiendas[s].indexOf(t);
   if(idx >= 0){
     state.openTiendas[s].splice(idx, 1); // Cerrar esta tienda
+    // Limpiar la semana si ya no tiene tiendas abiertas
+    if(state.openTiendas[s].length === 0){
+      delete state.openTiendas[s];
+    }
   } else {
     state.openTiendas[s].push(t); // Abrir esta tienda
   }
