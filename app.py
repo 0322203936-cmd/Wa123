@@ -1892,12 +1892,31 @@ function renderComparativo(){
             return {cfbc:acc.cfbc+o.cfbc,wmx:acc.wmx+o.wmx,unid:acc.unid+o.unid,emb:acc.emb+o.emb,mermaU:acc.mermaU+o.mermaU,mermaR:acc.mermaR+o.mermaR};
           },{cfbc:0,wmx:0,unid:0,emb:0,mermaU:0,mermaR:0});
 
+          // Cuando se ocultan tiendas: mostrar encabezado de tienda clickeable (para cerrar) arriba de sus productos
+          if(ocultarTiendas){
+            var pm2=mt.emb>0?(mt.mermaU/mt.emb*100).toFixed(1)+'%':'\u2014';
+            var share=totT.cfbc>0?(mt.cfbc/totT.cfbc*100).toFixed(1):'0.0';
+            bodyRows.push('<tr class="pivot-row-tienda" style="cursor:pointer;background:#e8f4fd;border-left:3px solid #0071ce;" onclick="drillTienda('+s+',\''+(x.t).replace(/\'/g,"\\\'")+'\')">'
+              +'<td style="padding-left:22px;color:#0071ce;">'
+              +'<span style="font-size:.75rem;margin-right:4px;">\u25bc</span>'
+              +x.t.replace('SC ','')
+              +'<span style="margin-left:5px;font-size:.65rem;color:#888;">'+share+'%</span>'
+              +'<span style="margin-left:8px;font-size:.62rem;color:#888;font-style:italic;">clic para cerrar</span>'
+              +'</td>'
+              +'<td>'+fmt(mt.unid)+'</td>'
+              +'<td style="font-weight:600">$'+fmt(mt.cfbc)+'</td>'
+              +'<td>$'+fmt(mt.wmx)+'</td>'
+              +'<td class="'+(mt.mermaU>0?'red':'')+'">'+fmt(mt.mermaU)+'</td>'
+              +'<td class="'+(mt.mermaR>0?'red':'')+'">$'+fmt(mt.mermaR)+'</td>'
+              +'<td>'+fmt(mt.emb)+'</td>'
+              +'<td class="'+(parseFloat(pm2)>10?'red':'')+'">'+pm2+'</td>'
+              +'<td></td></tr>');
+          }
+
           prodItems.forEach(function(o){
             var sharep=totP.cfbc>0?(o.cfbc/totP.cfbc*100).toFixed(1):'0.0';
-            // Agregar identificador de semana cuando se ocultan tiendas
-            var semIdentifier = ocultarTiendas ? ' <span style="color:#0071ce;font-weight:600;">['+semLabel(s)+' → '+x.t.replace('SC ','')+']</span>' : '';
             bodyRows.push('<tr class="pivot-row-prod" style="background:#f0f8ff;border-left:6px solid #5bc0de;">'
-              +'<td style="padding-left:40px;font-size:.68rem;color:#333;">'+o.p.replace('BQT ','')+semIdentifier
+              +'<td style="padding-left:40px;font-size:.68rem;color:#333;">'+o.p.replace('BQT ','')
               +'<span style="margin-left:4px;font-size:.62rem;color:#999;">'+sharep+'%</span></td>'
               +'<td style="font-size:.68rem">'+fmt(o.unid)+'</td>'
               +'<td style="font-weight:600;font-size:.68rem">$'+fmt(o.cfbc)+'</td>'
@@ -1908,7 +1927,7 @@ function renderComparativo(){
               +'<td></td><td></td></tr>');
           });
 
-          // Solo mostrar subtotal de tienda si NO estamos ocultando tiendas
+          // Subtotal de tienda: solo cuando NO se ocultan tiendas
           if(!ocultarTiendas){
             bodyRows.push('<tr style="background:#daeaf5;border-left:6px solid #5bc0de;font-weight:700;font-size:.68rem;">'
               +'<td style="padding-left:40px;color:#0071ce;">Subtotal '+x.t.replace('SC ','')+'</td>'
