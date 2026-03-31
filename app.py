@@ -2088,13 +2088,14 @@ function drillSemana(s){
   document.getElementById('compDrillTitle').textContent = 'Detalle Semana '+lbl+' — Tiendas y Productos (clic en tienda para expandir)';
   document.getElementById('compDrillContent').innerHTML = html;
   document.getElementById('compDrillBox').style.display = 'block';
-  document.getElementById('compDrillBox').scrollIntoView({behavior:'smooth',block:'start'});
+  setTimeout(resizeIframe, 80); document.getElementById('compDrillBox').scrollIntoView({behavior:'smooth',block:'start'});
 }
 
 function toggleDrillT(id){
   var el = document.getElementById(id);
   if(!el) return;
   el.style.display = el.style.display === 'none' ? 'table-row' : 'none';
+  setTimeout(resizeIframe, 50);
 }
 
 // Tienda seleccionada → productos de las semanas activas
@@ -2145,7 +2146,7 @@ function drillTienda(t){
   document.getElementById('compDrillTitle').textContent = 'Detalle '+tName+' — Productos por Semana';
   document.getElementById('compDrillContent').innerHTML = '<div style="overflow:auto"><table class="t"><thead>'+headHTML+'</thead><tbody>'+bodyHTML+'</tbody></table></div>';
   document.getElementById('compDrillBox').style.display = 'block';
-  document.getElementById('compDrillBox').scrollIntoView({behavior:'smooth',block:'start'});
+  setTimeout(resizeIframe, 80); document.getElementById('compDrillBox').scrollIntoView({behavior:'smooth',block:'start'});
 }
 
 // Producto seleccionado → tiendas de las semanas activas
@@ -2196,7 +2197,7 @@ function drillProducto(p){
   document.getElementById('compDrillTitle').textContent = 'Detalle '+pName+' — Tiendas por Semana';
   document.getElementById('compDrillContent').innerHTML = '<div style="overflow:auto"><table class="t"><thead>'+headHTML+'</thead><tbody>'+bodyHTML+'</tbody></table></div>';
   document.getElementById('compDrillBox').style.display = 'block';
-  document.getElementById('compDrillBox').scrollIntoView({behavior:'smooth',block:'start'});
+  setTimeout(resizeIframe, 80); document.getElementById('compDrillBox').scrollIntoView({behavior:'smooth',block:'start'});
 }
 
 function semLabel(s){
@@ -2378,18 +2379,8 @@ window.addEventListener('load', init);
     });
   } catch(e){}
 
-  // Auto-resize iframe to fit full content height after render
-  function resizeIframe(){
-    try {
-      var h = document.documentElement.scrollHeight || document.body.scrollHeight;
-      var frames = window.parent.document.querySelectorAll('iframe');
-      frames.forEach(function(f){ f.style.height = (h + 20) + 'px'; });
-    } catch(e){}
-  }
   // Resize on load and after any render
   window.addEventListener('load', function(){ setTimeout(resizeIframe, 300); });
-  var _origRender = window.render;
-  // Patch render and renderTienda to resize after draw
   var _patchResize = function(fn){
     return function(){ fn.apply(this,arguments); setTimeout(resizeIframe,100); };
   };
@@ -2399,14 +2390,30 @@ window.addEventListener('load', init);
   });
 })();
 
-// ── Auto-resize: reporta altura real al iframe padre de Streamlit ──
+// ── Auto-resize: ajusta el iframe de Streamlit al contenido real ──
 function resizeIframe(){
-  var h = document.body.scrollHeight;
-  window.parent.postMessage({type:'streamlit:setFrameHeight', height: h}, '*');
+  var h = Math.max(document.body.scrollHeight, document.documentElement.scrollHeight,
+                   document.body.offsetHeight, document.documentElement.offsetHeight);
+  window.parent.postMessage({type:'streamlit:setFrameHeight', height: h + 60}, '*');
+  try {
+    var frames = window.parent.document.querySelectorAll('iframe');
+    frames.forEach(function(f){ f.style.height = (h + 60) + 'px'; });
+  } catch(e){}
 }
-var _resizeObs = new ResizeObserver(function(){ resizeIframe(); });
+// Disparar resize varias veces tras cambios de DOM para capturar expansiones
+function resizeAfterChange(){
+  resizeIframe();
+  setTimeout(resizeIframe, 100);
+  setTimeout(resizeIframe, 300);
+  setTimeout(resizeIframe, 600);
+}
+var _resizeObs = new ResizeObserver(function(){ resizeAfterChange(); });
+_resizeObs.observe(document.documentElement);
 _resizeObs.observe(document.body);
-window.addEventListener('load', resizeIframe);
+window.addEventListener('load', function(){ resizeAfterChange(); });
+// Parchear toggleDrillT para que también dispare resize
+var _origToggleDrillT = toggleDrillT;
+toggleDrillT = function(id){ _origToggleDrillT(id); resizeAfterChange(); };
 </script>
 </body>
 </html>"""
@@ -2628,4 +2635,4 @@ with st.expander("⠀"):
 
 # ── Render del dashboard ──────────────────────────────────────────────────────
 html_content = build_html()
-components.html(html_content, height=1400, scrolling=False)
+components.html(html_content, height=2400, scrolling=False)
