@@ -856,66 +856,30 @@ html,body{height:auto;overflow-y:auto}
   <!-- Vista COMPARATIVO -->
   <div id="viewComparativo" style="display:none; padding:10px 16px; overflow:visible !important; height:auto !important;">
 
-    <!-- Layout principal: tabla izquierda | gráfica derecha -->
-    <div style="display:flex; gap:10px; align-items:flex-start; flex-wrap:wrap;">
-
-      <!-- Columna izquierda: tabla -->
-      <div class="box" style="flex:1 1 420px; overflow:auto; min-width:320px;">
-        <div class="box-hdr" id="compTableTitle">Semana vs Semana</div>
-        <table class="t" id="tComp">
-          <thead id="tCompHead"></thead>
-          <tbody id="tCompBody"></tbody>
-        </table>
-      </div>
-
-      <!-- Columna derecha: gráfica -->
-      <div class="box" style="flex:1 1 320px; overflow:visible; min-width:260px;" id="compChartBox">
-        <div class="box-hdr" id="compChartTitle">Venta CFBC por Semana</div>
-        <div id="compChart" style="padding:8px; overflow-x:auto;"></div>
-      </div>
+    <!-- Tabla dinámica pivot única -->
+    <div class="box" style="overflow:auto;">
+      <div class="box-hdr" id="compTableTitle">Comparativo — clic en semana para ver tiendas · clic en tienda para ver productos</div>
+      <table class="t" id="tComp">
+        <thead id="tCompHead"></thead>
+        <tbody id="tCompBody"></tbody>
+      </table>
     </div>
 
-    <!-- Panel drill-down: se despliega debajo del layout principal -->
-    <div id="compDrillBox" style="display:none; margin-top:10px;">
-
-      <!-- Título + botón cerrar -->
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-        <span id="compDrillTitle" style="font-size:.78rem; font-weight:700; color:#0071ce;"></span>
-        <button onclick="cerrarDrill()" style="padding:2px 10px;background:#e0e0e0;border:none;border-radius:4px;cursor:pointer;font-size:.7rem;">✕ Cerrar</button>
-      </div>
-
-      <!-- Drill layout: tabla tiendas | gráfica tiendas -->
-      <div style="display:flex; gap:10px; align-items:flex-start; flex-wrap:wrap;">
-        <div class="box" style="flex:1 1 380px; overflow:auto; min-width:280px;">
-          <div class="box-hdr" id="drillTiendaTitle">Tiendas</div>
-          <table class="t" id="tDrillTienda">
-            <thead id="tDrillTiendaHead"></thead>
-            <tbody id="tDrillTiendaBody"></tbody>
-          </table>
-        </div>
-        <div class="box" style="flex:1 1 260px; overflow:visible; min-width:220px;" id="drillChartTiendaBox">
-          <div class="box-hdr">Venta CFBC por Tienda</div>
-          <div id="drillChartTienda" style="padding:8px; overflow-x:auto;"></div>
-        </div>
-      </div>
-
-      <!-- Drill nivel 2: productos de la tienda seleccionada | gráfica productos -->
-      <div id="drillProdBox" style="display:none; margin-top:8px;">
-        <div style="display:flex; gap:10px; align-items:flex-start; flex-wrap:wrap;">
-          <div class="box" style="flex:1 1 380px; overflow:auto; min-width:280px;">
-            <div class="box-hdr" id="drillProdTitle">Productos</div>
-            <table class="t" id="tDrillProd">
-              <thead id="tDrillProdHead"></thead>
-              <tbody id="tDrillProdBody"></tbody>
-            </table>
-          </div>
-          <div class="box" style="flex:1 1 260px; overflow:visible; min-width:220px;">
-            <div class="box-hdr">Venta CFBC por Producto</div>
-            <div id="drillChartProd" style="padding:8px; overflow-x:auto;"></div>
-          </div>
-        </div>
-      </div>
-
+    <!-- IDs fantasma para compatibilidad con código antiguo (no se muestran) -->
+    <div style="display:none">
+      <div id="compDrillBox"></div>
+      <div id="compDrillTitle"></div>
+      <div id="drillTiendaTitle"></div>
+      <table><thead id="tDrillTiendaHead"></thead><tbody id="tDrillTiendaBody"></tbody></table>
+      <div id="drillChartTienda"></div>
+      <div id="drillProdBox"></div>
+      <div id="drillProdTitle"></div>
+      <table><thead id="tDrillProdHead"></thead><tbody id="tDrillProdBody"></tbody></table>
+      <div id="drillChartProd"></div>
+      <div id="compChart"></div>
+      <div id="compChartTitle"></div>
+      <div id="compChartBox"></div>
+      <div id="drillChartTiendaBox"></div>
     </div>
   </div>
 
@@ -1832,22 +1796,25 @@ function renderComparativo(){
   var prods = DATA.productos;
   var semsAct = sems.length ? sems : DATA.semanas.slice(-4);
 
-  // ── Tabla semanas ──────────────────────────────────────────────────────────
   var headHTML = '<tr>'
-    +'<th style="text-align:left">Semana</th>'
+    +'<th style="text-align:left;min-width:160px">Nivel</th>'
     +'<th>Unidades</th><th>Venta CFBC</th><th>Venta WMX</th>'
     +'<th>Merma U</th><th>Merma $</th><th>Embarque</th>'
     +'<th>% Merma</th><th>vs Ant.</th></tr>';
-  var bodyHTML = '';
+
+  var bodyRows = [];
   var prevCFBC = null;
-  var chartLabels=[], chartCFBC=[], chartMerma=[];
+
   semsAct.forEach(function(s){
     var m = sumMetrics([s], tiendas, prods);
-    var pm = m.emb>0?(m.mermaU/m.emb*100).toFixed(1)+'%':'—';
-    var vs = prevCFBC!==null ? pctSpan(m.cfbc,prevCFBC) : '—';
-    var isActive = (state.drillSem===s);
-    bodyHTML += '<tr style="cursor:pointer;'+(isActive?'background:#ddeeff;font-weight:700':'')+'" onclick="drillSemana('+s+')">'
-      +'<td style="font-weight:600;color:#0071ce">'+(isActive?'▼':'▶')+' '+semLabel(s)+'</td>'
+    var pm = m.emb>0?(m.mermaU/m.emb*100).toFixed(1)+'%':'\u2014';
+    var vs = prevCFBC!==null ? pctSpan(m.cfbc,prevCFBC) : '\u2014';
+    var semOpen = (state.drillSem===s);
+
+    bodyRows.push('<tr class="pivot-row-sem" style="cursor:pointer;background:'+(semOpen?'#cce5ff':'#f5f7fa')+';font-weight:700;" onclick="drillSemana('+s+')">'
+      +'<td style="padding-left:6px;color:#0071ce;">'
+      +'<span style="font-size:.8rem;margin-right:4px;">'+(semOpen?'\u25bc':'\u25b6')+'</span>'
+      +semLabel(s)+'</td>'
       +'<td>'+fmt(m.unid)+'</td>'
       +'<td style="font-weight:700">$'+fmt(m.cfbc)+'</td>'
       +'<td>$'+fmt(m.wmx)+'</td>'
@@ -1855,143 +1822,114 @@ function renderComparativo(){
       +'<td class="'+(m.mermaR>0?'red':'')+'">$'+fmt(m.mermaR)+'</td>'
       +'<td>'+fmt(m.emb)+'</td>'
       +'<td class="'+(parseFloat(pm)>10?'red':'')+'">'+pm+'</td>'
-      +'<td>'+vs+'</td></tr>';
-    chartLabels.push(semLabel(s)); chartCFBC.push(m.cfbc); chartMerma.push(m.mermaR);
+      +'<td>'+vs+'</td></tr>');
+
     prevCFBC = m.cfbc;
+
+    if(semOpen){
+      var tiendaItems = tiendas.map(function(t){
+        var mt = sumMetrics([s],[t],prods);
+        return {t:t,m:mt};
+      }).filter(function(x){return x.m.cfbc||x.m.unid||x.m.mermaU;})
+        .sort(function(a,b){return b.m.cfbc-a.m.cfbc;});
+
+      var totT = tiendaItems.reduce(function(acc,x){
+        return {cfbc:acc.cfbc+x.m.cfbc,wmx:acc.wmx+x.m.wmx,unid:acc.unid+x.m.unid,
+                mermaU:acc.mermaU+x.m.mermaU,mermaR:acc.mermaR+x.m.mermaR,emb:acc.emb+x.m.emb};
+      },{cfbc:0,wmx:0,unid:0,mermaU:0,mermaR:0,emb:0});
+
+      tiendaItems.forEach(function(x){
+        var mt=x.m;
+        var pm2=mt.emb>0?(mt.mermaU/mt.emb*100).toFixed(1)+'%':'\u2014';
+        var share=totT.cfbc>0?(mt.cfbc/totT.cfbc*100).toFixed(1):'0.0';
+        var tOpen=(state.drillTienda===x.t && state.drillSem===s);
+
+        bodyRows.push('<tr class="pivot-row-tienda" style="cursor:pointer;background:'+(tOpen?'#e8f4fd':'#fff')+';border-left:3px solid #0071ce;" onclick="drillTienda('+s+',\''+(x.t).replace(/\'/g,"\\\'")+'\')">'
+          +'<td style="padding-left:22px;color:#0071ce;">'
+          +'<span style="font-size:.75rem;margin-right:4px;">'+(tOpen?'\u25bc':'\u25b6')+'</span>'
+          +x.t.replace('SC ','')
+          +'<span style="margin-left:5px;font-size:.65rem;color:#888;">'+share+'%</span>'
+          +'</td>'
+          +'<td>'+fmt(mt.unid)+'</td>'
+          +'<td style="font-weight:600">$'+fmt(mt.cfbc)+'</td>'
+          +'<td>$'+fmt(mt.wmx)+'</td>'
+          +'<td class="'+(mt.mermaU>0?'red':'')+'">'+fmt(mt.mermaU)+'</td>'
+          +'<td class="'+(mt.mermaR>0?'red':'')+'">$'+fmt(mt.mermaR)+'</td>'
+          +'<td>'+fmt(mt.emb)+'</td>'
+          +'<td class="'+(parseFloat(pm2)>10?'red':'')+'">'+pm2+'</td>'
+          +'<td></td></tr>');
+
+        if(tOpen){
+          var prodItems = prods.map(function(p){
+            var d=(DATA.raw_prod_semana&&DATA.raw_prod_semana[x.t]&&DATA.raw_prod_semana[x.t][String(s)]&&DATA.raw_prod_semana[x.t][String(s)][p])||{};
+            return {p:p,cfbc:d.venta_cfbc||0,wmx:d.venta_wmx||0,unid:d.ventas_u||0,emb:d.embarque_u||0,mermaU:d.merma_u||0,mermaR:d.retail_vc||0};
+          }).filter(function(o){return o.cfbc||o.unid||o.mermaU;})
+            .sort(function(a,b){return b.cfbc-a.cfbc;});
+
+          var totP=prodItems.reduce(function(acc,o){
+            return {cfbc:acc.cfbc+o.cfbc,wmx:acc.wmx+o.wmx,unid:acc.unid+o.unid,emb:acc.emb+o.emb,mermaU:acc.mermaU+o.mermaU,mermaR:acc.mermaR+o.mermaR};
+          },{cfbc:0,wmx:0,unid:0,emb:0,mermaU:0,mermaR:0});
+
+          prodItems.forEach(function(o){
+            var sharep=totP.cfbc>0?(o.cfbc/totP.cfbc*100).toFixed(1):'0.0';
+            bodyRows.push('<tr class="pivot-row-prod" style="background:#f0f8ff;border-left:6px solid #5bc0de;">'
+              +'<td style="padding-left:40px;font-size:.68rem;color:#333;">'+o.p.replace('BQT ','')
+              +'<span style="margin-left:4px;font-size:.62rem;color:#999;">'+sharep+'%</span></td>'
+              +'<td style="font-size:.68rem">'+fmt(o.unid)+'</td>'
+              +'<td style="font-weight:600;font-size:.68rem">$'+fmt(o.cfbc)+'</td>'
+              +'<td style="font-size:.68rem">$'+fmt(o.wmx)+'</td>'
+              +'<td class="'+(o.mermaU>0?'red':'')+'" style="font-size:.68rem">'+fmt(o.mermaU)+'</td>'
+              +'<td class="'+(o.mermaR>0?'red':'')+'" style="font-size:.68rem">$'+fmt(o.mermaR)+'</td>'
+              +'<td style="font-size:.68rem">'+fmt(o.emb)+'</td>'
+              +'<td></td><td></td></tr>');
+          });
+
+          bodyRows.push('<tr style="background:#daeaf5;border-left:6px solid #5bc0de;font-weight:700;font-size:.68rem;">'
+            +'<td style="padding-left:40px;color:#0071ce;">Subtotal '+x.t.replace('SC ','')+'</td>'
+            +'<td>'+fmt(totP.unid)+'</td><td>$'+fmt(totP.cfbc)+'</td><td>$'+fmt(totP.wmx)+'</td>'
+            +'<td class="red">'+fmt(totP.mermaU)+'</td><td class="red">$'+fmt(totP.mermaR)+'</td>'
+            +'<td>'+fmt(totP.emb)+'</td><td></td><td></td></tr>');
+        }
+      });
+
+      var totAll2=sumMetrics([s],tiendas,prods);
+      bodyRows.push('<tr style="background:#b8d4f0;font-weight:700;border-left:3px solid #0071ce;">'
+        +'<td style="padding-left:22px;color:#0071ce;">Subtotal Sem '+semLabel(s)+'</td>'
+        +'<td>'+fmt(totAll2.unid)+'</td><td style="font-weight:700">$'+fmt(totAll2.cfbc)+'</td>'
+        +'<td>$'+fmt(totAll2.wmx)+'</td>'
+        +'<td class="red">'+fmt(totAll2.mermaU)+'</td><td class="red">$'+fmt(totAll2.mermaR)+'</td>'
+        +'<td>'+fmt(totAll2.emb)+'</td><td></td><td></td></tr>');
+    }
   });
+
   var totAll = sumMetrics(semsAct, tiendas, prods);
-  bodyHTML += '<tr class="total"><td>TOTAL</td>'
+  bodyRows.push('<tr class="total"><td>TOTAL GENERAL</td>'
     +'<td>'+fmt(totAll.unid)+'</td><td>$'+fmt(totAll.cfbc)+'</td><td>$'+fmt(totAll.wmx)+'</td>'
     +'<td class="red">'+fmt(totAll.mermaU)+'</td><td class="red">$'+fmt(totAll.mermaR)+'</td>'
-    +'<td>'+fmt(totAll.emb)+'</td><td></td><td></td></tr>';
+    +'<td>'+fmt(totAll.emb)+'</td><td></td><td></td></tr>');
 
   document.getElementById('tCompHead').innerHTML = headHTML;
-  document.getElementById('tCompBody').innerHTML = bodyHTML;
-  document.getElementById('compChart').innerHTML = buildBarChart(chartLabels, chartCFBC, chartMerma, 'Venta CFBC','Merma $', 340, 160);
-
-  // Si hay semana activa en drill, re-renderizarla
-  if(state.drillSem) _renderDrillTiendas(state.drillSem);
-  else document.getElementById('compDrillBox').style.display = 'none';
+  document.getElementById('tCompBody').innerHTML = bodyRows.join('');
 }
 
-// ─── DRILL NIVEL 1: clic en semana → tiendas + gráfica tiendas ───────────────
 function drillSemana(s){
-  if(state.drillSem === s){ state.drillSem = null; state.drillTienda = null; document.getElementById('compDrillBox').style.display='none'; renderComparativo(); return; }
-  state.drillSem = s; state.drillTienda = null;
+  if(state.drillSem===s){ state.drillSem=null; state.drillTienda=null; }
+  else { state.drillSem=s; state.drillTienda=null; }
   renderComparativo();
 }
 
-function _renderDrillTiendas(s){
-  var tiendas = DATA.tiendas; var prods = DATA.productos;
-  var lbl = semLabel(s);
-
-  var tiendaItems = tiendas.map(function(t){
-    var m = sumMetrics([s],[t],prods);
-    return {t:t,m:m};
-  }).filter(function(x){return x.m.cfbc||x.m.unid||x.m.mermaU;})
-    .sort(function(a,b){return b.m.cfbc-a.m.cfbc;});
-
-  var totT = tiendaItems.reduce(function(acc,x){
-    return {cfbc:acc.cfbc+x.m.cfbc,wmx:acc.wmx+x.m.wmx,unid:acc.unid+x.m.unid,mermaU:acc.mermaU+x.m.mermaU,mermaR:acc.mermaR+x.m.mermaR,emb:acc.emb+x.m.emb};
-  },{cfbc:0,wmx:0,unid:0,mermaU:0,mermaR:0,emb:0});
-
-  var hd = '<tr><th style="text-align:left">Tienda</th><th>Unidades</th><th>Venta CFBC</th><th>% Total</th><th>Venta WMX</th><th>Embarque</th><th>Merma U</th><th>Merma $</th><th>% Merma</th></tr>';
-  var bd = '';
-  tiendaItems.forEach(function(x){
-    var m=x.m, share=totT.cfbc>0?(m.cfbc/totT.cfbc*100).toFixed(1):'0.0';
-    var pm=m.emb>0?(m.mermaU/m.emb*100).toFixed(1)+'%':'—';
-    var isActive=(state.drillTienda===x.t);
-    bd += '<tr style="cursor:pointer;'+(isActive?'background:#ddeeff;font-weight:700':'')+'" onclick="drillTienda(\''+x.t.replace(/'/g,"\\'")+'\')">'
-      +'<td style="font-weight:600;color:#0071ce">'+(isActive?'▼':'▶')+' '+x.t.replace('SC ','')+'</td>'
-      +'<td>'+fmt(m.unid)+'</td>'
-      +'<td style="font-weight:700">$'+fmt(m.cfbc)+'</td>'
-      +'<td><div style="display:flex;align-items:center;gap:3px"><div style="width:'+Math.min(60,Math.round(parseFloat(share)))+'px;height:7px;background:#0071ce;border-radius:2px"></div><span>'+share+'%</span></div></td>'
-      +'<td>$'+fmt(m.wmx)+'</td><td>'+fmt(m.emb)+'</td>'
-      +'<td class="'+(m.mermaU>0?'red':'')+'">'+fmt(m.mermaU)+'</td>'
-      +'<td class="'+(m.mermaR>0?'red':'')+'">$'+fmt(m.mermaR)+'</td>'
-      +'<td class="'+(parseFloat(pm)>10?'red':'')+'">'+pm+'</td></tr>';
-  });
-  bd += '<tr class="total"><td>TOTAL</td><td>'+fmt(totT.unid)+'</td><td>$'+fmt(totT.cfbc)+'</td><td>100%</td><td>$'+fmt(totT.wmx)+'</td><td>'+fmt(totT.emb)+'</td><td class="red">'+fmt(totT.mermaU)+'</td><td class="red">$'+fmt(totT.mermaR)+'</td><td></td></tr>';
-
-  document.getElementById('drillTiendaTitle').textContent = 'Tiendas — Semana '+lbl+' (clic para ver productos)';
-  document.getElementById('tDrillTiendaHead').innerHTML = hd;
-  document.getElementById('tDrillTiendaBody').innerHTML = bd;
-
-  var chartLbls = tiendaItems.map(function(x){return x.t.replace('SC ','');});
-  document.getElementById('drillChartTienda').innerHTML = buildBarChart(chartLbls,
-    tiendaItems.map(function(x){return x.m.cfbc;}),
-    tiendaItems.map(function(x){return x.m.mermaR;}),
-    'Venta CFBC','Merma $', 320, 150);
-
-  document.getElementById('compDrillTitle').textContent = '📅 Detalle Semana '+lbl;
-  document.getElementById('compDrillBox').style.display = 'block';
-
-  // Si hay tienda activa, re-renderizar productos
-  if(state.drillTienda) _renderDrillProductos(s, state.drillTienda);
-  else document.getElementById('drillProdBox').style.display = 'none';
-
-  resizeAfterChange();
-  setTimeout(function(){ document.getElementById('compDrillBox').scrollIntoView({behavior:'smooth',block:'nearest'}); }, 80);
-}
-
-// ─── DRILL NIVEL 2: clic en tienda → productos + gráfica productos ────────────
-function drillTienda(t){
-  if(state.drillTienda === t){ state.drillTienda = null; document.getElementById('drillProdBox').style.display='none'; _renderDrillTiendas(state.drillSem); return; }
-  state.drillTienda = t;
-  _renderDrillTiendas(state.drillSem);
-}
-
-function _renderDrillProductos(s, t){
-  var prods = DATA.productos;
-  var tName = t.replace('SC ','');
-
-  var prodItems = prods.map(function(p){
-    var d = (DATA.raw_prod_semana&&DATA.raw_prod_semana[t]&&DATA.raw_prod_semana[t][String(s)]&&DATA.raw_prod_semana[t][String(s)][p])||{};
-    return {p:p, cfbc:d.venta_cfbc||0, wmx:d.venta_wmx||0, unid:d.ventas_u||0, emb:d.embarque_u||0, mermaU:d.merma_u||0, mermaR:d.retail_vc||0};
-  }).filter(function(o){return o.cfbc||o.unid||o.mermaU;})
-    .sort(function(a,b){return b.cfbc-a.cfbc;});
-
-  var totP = prodItems.reduce(function(acc,o){
-    return {cfbc:acc.cfbc+o.cfbc,wmx:acc.wmx+o.wmx,unid:acc.unid+o.unid,emb:acc.emb+o.emb,mermaU:acc.mermaU+o.mermaU,mermaR:acc.mermaR+o.mermaR};
-  },{cfbc:0,wmx:0,unid:0,emb:0,mermaU:0,mermaR:0});
-
-  var hd = '<tr><th style="text-align:left">Producto</th><th>Unidades</th><th>Venta CFBC</th><th>% Total</th><th>Venta WMX</th><th>Embarque</th><th>Merma U</th><th>Merma $</th></tr>';
-  var bd = '';
-  prodItems.forEach(function(o){
-    var share = totP.cfbc>0?(o.cfbc/totP.cfbc*100).toFixed(1):'0.0';
-    bd += '<tr>'
-      +'<td style="font-weight:600">'+o.p.replace('BQT ','')+'</td>'
-      +'<td>'+fmt(o.unid)+'</td>'
-      +'<td style="font-weight:700">$'+fmt(o.cfbc)+'</td>'
-      +'<td><div style="display:flex;align-items:center;gap:3px"><div style="width:'+Math.min(60,Math.round(parseFloat(share)))+'px;height:7px;background:#0071ce;border-radius:2px"></div><span>'+share+'%</span></div></td>'
-      +'<td>$'+fmt(o.wmx)+'</td><td>'+fmt(o.emb)+'</td>'
-      +'<td class="'+(o.mermaU>0?'red':'')+'">'+fmt(o.mermaU)+'</td>'
-      +'<td class="'+(o.mermaR>0?'red':'')+'">$'+fmt(o.mermaR)+'</td></tr>';
-  });
-  bd += '<tr class="total"><td>TOTAL</td><td>'+fmt(totP.unid)+'</td><td>$'+fmt(totP.cfbc)+'</td><td>100%</td><td>$'+fmt(totP.wmx)+'</td><td>'+fmt(totP.emb)+'</td><td class="red">'+fmt(totP.mermaU)+'</td><td class="red">$'+fmt(totP.mermaR)+'</td></tr>';
-
-  document.getElementById('drillProdTitle').textContent = 'Productos — '+tName+' · Sem '+semLabel(s);
-  document.getElementById('tDrillProdHead').innerHTML = hd;
-  document.getElementById('tDrillProdBody').innerHTML = bd;
-
-  var chartLbls = prodItems.map(function(o){return o.p.replace('BQT ','');});
-  document.getElementById('drillChartProd').innerHTML = buildBarChart(chartLbls,
-    prodItems.map(function(o){return o.cfbc;}),
-    prodItems.map(function(o){return o.mermaR;}),
-    'Venta CFBC','Merma $', 320, 150);
-
-  document.getElementById('drillProdBox').style.display = 'block';
-  resizeAfterChange();
-  setTimeout(function(){ document.getElementById('drillProdBox').scrollIntoView({behavior:'smooth',block:'nearest'}); }, 80);
-}
-
-function cerrarDrill(){
-  state.drillSem = null; state.drillTienda = null;
-  document.getElementById('compDrillBox').style.display = 'none';
+function drillTienda(s,t){
+  if(state.drillTienda===t && state.drillSem===s){ state.drillTienda=null; }
+  else { state.drillSem=s; state.drillTienda=t; }
   renderComparativo();
 }
+
+function cerrarDrill(){ state.drillSem=null; state.drillTienda=null; renderComparativo(); }
+function _renderDrillTiendas(s){ /* integrado en renderComparativo */ }
+function _renderDrillProductos(s,t){ /* integrado en renderComparativo */ }
 
 function setCompMode(m){ renderComparativo(); }
+
 
 function selInvTienda(t){
   // Si ya está seleccionada, deseleccionar
