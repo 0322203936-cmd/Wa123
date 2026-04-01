@@ -869,7 +869,7 @@ html,body{height:auto;overflow-y:auto}
       </div>
 
       <!-- Columna derecha: gráfica dinámica (oculta) -->
-      <div class="box" style="display:none;">
+      <div class="box" style="flex:1 1 300px; overflow:visible; min-width:240px; visibility:hidden;">
         <div class="box-hdr" id="compChartTitle">Venta CFBC por Semana</div>
         <div id="compChart" style="padding:8px; overflow-x:auto;"></div>
       </div>
