@@ -868,8 +868,8 @@ html,body{height:auto;overflow-y:auto}
         </table>
       </div>
 
-      <!-- Columna derecha: gráfica dinámica -->
-      <div class="box" style="flex:1 1 300px; overflow:visible; min-width:240px;">
+      <!-- Columna derecha: gráfica dinámica (oculta) -->
+      <div class="box" style="display:none;">
         <div class="box-hdr" id="compChartTitle">Venta CFBC por Semana</div>
         <div id="compChart" style="padding:8px; overflow-x:auto;"></div>
       </div>
@@ -1867,7 +1867,7 @@ function renderComparativo(){
       tiendaItemsRender.forEach(function(x){
         var mt=x.m;
         var pm2=mt.emb>0?(mt.mermaU/mt.emb*100).toFixed(1)+'%':'\u2014';
-        var share=totT.cfbc>0?(mt.cfbc/totT.cfbc*100).toFixed(1):'0.0';
+        var share=totT.unid>0?(mt.unid/totT.unid*100).toFixed(1):'0.0';
         var tOpen=(state.openTiendas && state.openTiendas[s] && state.openTiendas[s].indexOf(x.t) >= 0);
 
         // Solo mostrar fila de tienda si NO estamos ocultando tiendas
@@ -1902,7 +1902,7 @@ function renderComparativo(){
           // Cuando se ocultan tiendas: mostrar encabezado de tienda clickeable (para cerrar) arriba de sus productos
           if(ocultarTiendas){
             var pm2=mt.emb>0?(mt.mermaU/mt.emb*100).toFixed(1)+'%':'\u2014';
-            var share=totT.cfbc>0?(mt.cfbc/totT.cfbc*100).toFixed(1):'0.0';
+            var share=totT.unid>0?(mt.unid/totT.unid*100).toFixed(1):'0.0';
             bodyRows.push('<tr class="pivot-row-tienda" style="cursor:pointer;background:#e8f4fd;border-left:3px solid #0071ce;" onclick="drillTienda('+s+',\''+(x.t).replace(/\'/g,"\\\'")+'\')">'
               +'<td style="padding-left:22px;color:#0071ce;">'
               +'<span style="font-size:.75rem;margin-right:4px;">\u25bc</span>'
@@ -1921,7 +1921,7 @@ function renderComparativo(){
           }
 
           prodItems.forEach(function(o){
-            var sharep=totP.cfbc>0?(o.cfbc/totP.cfbc*100).toFixed(1):'0.0';
+            var sharep=totP.unid>0?(o.unid/totP.unid*100).toFixed(1):'0.0';
             bodyRows.push('<tr class="pivot-row-prod" style="background:#f0f8ff;border-left:6px solid #5bc0de;">'
               +'<td style="padding-left:40px;font-size:.68rem;color:#333;">'+o.p.replace('BQT ','')
               +'<span style="margin-left:4px;font-size:.62rem;color:#999;">'+sharep+'%</span></td>'
