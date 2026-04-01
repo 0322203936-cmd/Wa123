@@ -2358,106 +2358,102 @@ div[data-testid="stExpander"] summary [data-testid="stExpanderToggleIcon"] {
     opacity: 0.7;
 }
 
-/* ── Panel desplegable ── */
-div[data-testid="stExpander"] [data-testid="stExpanderDetails"] {
-    position: absolute !important;
-    right: 0 !important;
-    top: calc(100% + 4px) !important;
-    min-width: 280px !important;
-    padding: 12px 14px !important;
-    background: #fff !important;
-    border: 1px solid #ddd !important;
-    border-radius: 6px !important;
-    box-shadow: 0 4px 18px rgba(0,0,0,.13) !important;
-}
-
-/* ── Panel desplegable — rediseño profesional ── */
+/* ── Panel desplegable ejecutivo ── */
 div[data-testid="stExpander"] [data-testid="stExpanderDetails"] {
     position: absolute !important;
     right: 0 !important;
     top: calc(100% + 6px) !important;
-    min-width: 320px !important;
+    min-width: 300px !important;
     padding: 0 !important;
     background: #ffffff !important;
-    border: 1px solid #e0e6ef !important;
-    border-radius: 10px !important;
-    box-shadow: 0 8px 32px rgba(0,60,140,.13), 0 1.5px 6px rgba(0,0,0,.07) !important;
+    border: 1px solid #d0d7e2 !important;
+    border-radius: 8px !important;
+    box-shadow: 0 12px 40px rgba(0,20,60,.14), 0 2px 8px rgba(0,0,0,.06) !important;
     overflow: hidden !important;
+    font-family: 'Segoe UI', sans-serif !important;
 }
 
-/* ── Cabecera azul del panel ── */
+/* ── Cabecera oscura ejecutiva ── */
 div[data-testid="stExpander"] [data-testid="stExpanderDetails"]::before {
-    content: "Actualizar datos en SharePoint" !important;
+    content: "☁  Sincronizar con SharePoint" !important;
     display: block !important;
-    background: linear-gradient(90deg,#0071ce,#004f9a) !important;
-    color: #fff !important;
-    font-size: .78rem !important;
-    font-weight: 700 !important;
-    letter-spacing: .03em !important;
-    padding: 10px 16px !important;
-    font-family: Arial, sans-serif !important;
+    background: #0d1f3c !important;
+    color: #e8edf5 !important;
+    font-size: .73rem !important;
+    font-weight: 600 !important;
+    letter-spacing: .06em !important;
+    text-transform: uppercase !important;
+    padding: 11px 16px !important;
+    font-family: 'Segoe UI', sans-serif !important;
+    border-bottom: 2px solid #0071ce !important;
 }
 
-/* ── Contenido interno con padding ── */
+/* ── Contenido interno ── */
 div[data-testid="stExpander"] [data-testid="stExpanderDetails"] > div {
-    padding: 14px 16px 12px !important;
+    padding: 14px 16px 14px !important;
+    background: #f8fafc !important;
 }
 
-/* ── Texto interno ── */
+/* ── Texto caption ── */
 div[data-testid="stExpander"] [data-testid="stExpanderDetails"] p {
-    font-size: .72rem !important;
-    color: #555 !important;
-    margin: 0 0 8px 0 !important;
-    font-family: Arial, sans-serif !important;
+    font-size: .68rem !important;
+    color: #6b7a90 !important;
+    margin: 0 0 10px 0 !important;
+    font-family: 'Segoe UI', sans-serif !important;
+    letter-spacing: .02em !important;
 }
 div[data-testid="stExpander"] [data-testid="stExpanderDetails"] small {
-    font-size: .67rem !important;
-    color: #888 !important;
+    font-size: .65rem !important;
+    color: #9aa5b4 !important;
 }
 div[data-testid="stExpander"] [data-testid="stExpanderDetails"] strong {
-    font-size: .75rem !important;
-    color: #111 !important;
+    font-size: .72rem !important;
+    color: #0d1f3c !important;
+    font-weight: 600 !important;
 }
 
-/* ── File uploader limpio ── */
+/* ── File uploader ejecutivo ── */
 div[data-testid="stExpander"] [data-testid="stFileUploader"] {
-    border: 1.5px dashed #b0c4de !important;
-    border-radius: 7px !important;
-    background: #f5f8ff !important;
+    border: 1.5px dashed #c2ccd8 !important;
+    border-radius: 6px !important;
+    background: #ffffff !important;
     padding: 4px !important;
-    transition: border-color .2s !important;
+    transition: border-color .2s, background .2s !important;
 }
 div[data-testid="stExpander"] [data-testid="stFileUploader"]:hover {
     border-color: #0071ce !important;
+    background: #f0f6ff !important;
 }
 div[data-testid="stExpander"] [data-testid="stFileUploader"] span {
-    font-size: .72rem !important;
-    color: #444 !important;
+    font-size: .68rem !important;
+    color: #6b7a90 !important;
 }
 
-/* ── Botón Subir ── */
+/* ── Botón ejecutivo ── */
 div[data-testid="stExpander"] .stButton button {
-    background: linear-gradient(90deg,#0071ce,#004f9a) !important;
-    color: #fff !important;
+    background: #0d1f3c !important;
+    color: #ffffff !important;
     border: none !important;
-    border-radius: 6px !important;
-    font-size: .74rem !important;
-    font-weight: 700 !important;
-    letter-spacing: .04em !important;
-    padding: 7px 0 !important;
+    border-radius: 5px !important;
+    font-size: .70rem !important;
+    font-weight: 600 !important;
+    letter-spacing: .08em !important;
+    text-transform: uppercase !important;
+    padding: 9px 0 !important;
     width: 100% !important;
     cursor: pointer !important;
-    transition: opacity .15s !important;
-    margin-top: 6px !important;
+    transition: background .18s !important;
+    margin-top: 10px !important;
+    font-family: 'Segoe UI', sans-serif !important;
 }
 div[data-testid="stExpander"] .stButton button:hover {
-    opacity: .88 !important;
+    background: #0071ce !important;
 }
 </style>
 """, unsafe_allow_html=True)
 
 with st.expander("⠀"):
-    st.caption("📁 Fila 26 · cols A → AS · hoja **Data**")
+    st.caption("Fila 26 · Cols A → AS · Hoja **Data**")
     archivo = st.file_uploader("Excel", type=["xlsx","xlsm","xls"], key="up_sp", label_visibility="collapsed")
     if st.button("⬆ Subir a SharePoint", type="primary", use_container_width=True):
         if archivo is None:
