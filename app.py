@@ -886,13 +886,13 @@ html,body{height:auto;overflow-y:auto}
 #viewGasto .box-hdr{overflow:visible!important}
 #viewGasto .box>div{overflow:visible!important;height:auto!important;max-height:none!important}
 #viewGasto table{overflow:visible!important}
-#viewGasto table.t{font-size:.62rem}
-#viewGasto table.t th{font-size:.60rem;padding:2px 4px;white-space:nowrap}
-#viewGasto table.t td{padding:1px 4px;font-size:.62rem}
-#viewGasto .ruta-row td{background:#e8f4fd;font-weight:700;border-top:2px solid #0071ce;border-bottom:1px solid #bbb;font-size:.64rem}
-#viewGasto .unidad-row td{font-size:.60rem}
+#viewGasto table.t{font-size:.72rem}
+#viewGasto table.t th{font-size:.69rem;padding:2px 4px;white-space:nowrap}
+#viewGasto table.t td{padding:1px 4px;font-size:.72rem}
+#viewGasto .ruta-row td{background:#e8f4fd;font-weight:700;border-top:2px solid #0071ce;border-bottom:1px solid #bbb;font-size:.74rem}
+#viewGasto .unidad-row td{font-size:.69rem}
 #viewGasto .unidad-row td:first-child{padding-left:16px;color:#555}
-#viewGasto .grand-total td{background:#0071ce;color:white;font-weight:700;border-top:3px solid #004a8a;font-size:.64rem}
+#viewGasto .grand-total td{background:#0071ce;color:white;font-weight:700;border-top:3px solid #004a8a;font-size:.74rem}
 </style>
 </head>
 <body>
@@ -1914,7 +1914,7 @@ function renderGasolina(){
 
   // ── Sección: Gasolina por Vehículo ──
   if(vehiculos.length > 0){
-    bodyHTML += '<tr style="background:#fff3e0;"><td colspan="'+(sems.length+2)+'" style="padding:2px 4px;font-size:.62rem;color:#555;">Gasolina por Vehículo</td></tr>';
+    bodyHTML += '<tr style="background:#fff3e0;"><td colspan="'+(sems.length+2)+'" style="padding:2px 4px;font-size:.72rem;color:#555;">Gasolina por Vehículo</td></tr>';
     vehiculos.forEach(function(veh){
       var vehData  = gData[veh] || {};
       var vehTotal = 0;
@@ -1934,7 +1934,7 @@ function renderGasolina(){
   // ── Sección: Otros Gastos (hoja Gastos del SharePoint) ──
   var tiposConDatos = gTipos.filter(function(t){ return gOtros[t]; });
   if(tiposConDatos.length > 0){
-    bodyHTML += '<tr style="background:#fff3e0;"><td colspan="'+(sems.length+2)+'" style="padding:2px 4px;font-size:.62rem;color:#555;">Otros Gastos</td></tr>';
+    bodyHTML += '<tr style="background:#fff3e0;"><td colspan="'+(sems.length+2)+'" style="padding:2px 4px;font-size:.72rem;color:#555;">Otros Gastos</td></tr>';
     tiposConDatos.forEach(function(tipo){
       var tipoData  = gOtros[tipo] || {};
       var tipoTotal = 0;
