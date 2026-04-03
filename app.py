@@ -603,6 +603,99 @@ def cargar_datos(url: str = "") -> dict:
     return result_dict
 
 # ══════════════════════════════════════════════════════
+# GASOLINA — SharePoint externo (pacificafarms)
+# ══════════════════════════════════════════════════════
+_GASOLINA_SHARED_LINK = "http://pacificafarms-my.sharepoint.com/:x:/g/personal/anahi_mora_cfbc_co/IQANE_rjNbe-T5n5XZuwt3FwAa9dla1RGnbl1oC9PGuNO-o?e=Zs5Rzw"
+_VEHICULOS_GASOLINA   = ['FORD / TRANSIT 250 / 2020', 'FORD / TRANSIT / 2019']
+
+@st.cache_data(ttl=3600, show_spinner=False)
+def cargar_gasolina() -> dict:
+    """
+    Descarga la hoja 'Base datos' desde SharePoint (link compartido).
+    Columnas: F=Fecha (idx 5), L=Total (idx 11), R=Vehículo (idx 17).
+    Agrupa por vehículo → semana (YYYYSS) → total $.
+    Credenciales en st.secrets['sharepoint_gasolina']: tenant_id, client_id, client_secret.
+    """
+    import datetime, math
+
+    cfg = st.secrets["sharepoint_gasolina"]
+
+    # ── Auth ──
+    app_msal = msal.ConfidentialClientApplication(
+        cfg["client_id"],
+        authority=f"https://login.microsoftonline.com/{cfg['tenant_id']}",
+        client_credential=cfg["client_secret"],
+    )
+    token = app_msal.acquire_token_for_client(
+        scopes=["https://graph.microsoft.com/.default"]
+    )
+    if "access_token" not in token:
+        raise RuntimeError(f"Error auth gasolina: {token.get('error_description', token)}")
+
+    hdrs = {"Authorization": f"Bearer {token['access_token']}"}
+
+    # ── Codificar shared link → share token ──
+    encoded = base64.b64encode(
+        _GASOLINA_SHARED_LINK.encode()
+    ).decode().rstrip('=').replace('+', '-').replace('/', '_')
+    share_token = f"u!{encoded}"
+
+    # ── Leer usedRange de la hoja "Base datos" ──
+    url = (
+        f"https://graph.microsoft.com/v1.0/shares/{share_token}"
+        f"/driveItem/workbook/worksheets/Base%20datos/usedRange"
+    )
+    resp = requests.get(url, headers=hdrs, timeout=60)
+    resp.raise_for_status()
+    values = resp.json().get("values", [])
+
+    # Índices de columna (0-based): F=5, L=11, R=17
+    COL_FECHA = 5
+    COL_TOTAL = 11
+    COL_VEH   = 17
+
+    def _parse_fecha(v):
+        """Acepta serial Excel (int/float), string ISO o datetime."""
+        if isinstance(v, (int, float)) and v > 0:
+            return datetime.datetime(1899, 12, 30) + datetime.timedelta(days=int(v))
+        if isinstance(v, str):
+            for fmt in ('%Y-%m-%d', '%d/%m/%Y', '%m/%d/%Y'):
+                try:
+                    return datetime.datetime.strptime(v[:10], fmt)
+                except ValueError:
+                    pass
+        if hasattr(v, 'isocalendar'):
+            return v
+        return None
+
+    # Agrupar: vehiculo → semana (YYYYWW) → total $
+    resultado = {v: {} for v in _VEHICULOS_GASOLINA}
+    semanas_set = set()
+
+    for row in values[3:]:           # fila 4 en adelante (índice 3)
+        if len(row) <= max(COL_FECHA, COL_TOTAL, COL_VEH):
+            continue
+        vehiculo = str(row[COL_VEH]).strip() if row[COL_VEH] is not None else ''
+        if vehiculo not in _VEHICULOS_GASOLINA:
+            continue
+        fecha = _parse_fecha(row[COL_FECHA])
+        if fecha is None:
+            continue
+        try:
+            total = float(row[COL_TOTAL]) if row[COL_TOTAL] not in (None, '', 'None') else 0.0
+        except (ValueError, TypeError):
+            total = 0.0
+        iso  = fecha.isocalendar()
+        sem  = int(iso[0]) * 100 + int(iso[1])   # YYYYWW
+        resultado[vehiculo][sem] = resultado[vehiculo].get(sem, 0.0) + total
+        semanas_set.add(sem)
+
+    return {
+        'gasolina_por_vehiculo': resultado,
+        'gasolina_semanas':      sorted(semanas_set),
+    }
+
+# ══════════════════════════════════════════════════════
 # DIAGNÓSTICO TEMPORAL — borrar después de encontrar la ruta
 # ══════════════════════════════════════════════════════
 def _diagnostico_sharepoint():
@@ -659,6 +752,18 @@ try:
 except Exception as e:
     st.error(f"❌ Error cargando datos: {e}")
     st.stop()
+
+# ── Gasolina (fuente separada — SharePoint pacificafarms) ──
+try:
+    _gas = cargar_gasolina()
+    DATA['gasolina_por_vehiculo'] = _gas['gasolina_por_vehiculo']
+    DATA['gasolina_semanas']      = _gas['gasolina_semanas']
+    DATA['vehiculos_gasolina']    = _VEHICULOS_GASOLINA
+except Exception as _eg:
+    DATA['gasolina_por_vehiculo'] = {v: {} for v in _VEHICULOS_GASOLINA}
+    DATA['gasolina_semanas']      = []
+    DATA['vehiculos_gasolina']    = _VEHICULOS_GASOLINA
+    st.warning(f"⚠️ No se pudieron cargar datos de gasolina: {_eg}")
 
 HTML = r"""<!DOCTYPE html>
 <html lang="es">
@@ -922,11 +1027,14 @@ html,body{height:auto;overflow-y:auto}
         </div>
       </div>
       
-      <!-- Espacio para la segunda tabla -->
+      <!-- Tabla Gasto Gasolina -->
       <div class="box" style="overflow:visible !important; height:auto !important;">
-        <div class="box-hdr">Próxima tabla aquí</div>
-        <div style="padding:20px; text-align:center; color:#999; overflow:visible !important; height:auto !important;">
-          Espacio reservado para la siguiente tabla
+        <div class="box-hdr">Gasto Gasolina por Vehículo</div>
+        <div style="overflow:visible !important; height:auto !important;">
+          <table class="t" id="tGasolina">
+            <thead id="tGasolinaHead"></thead>
+            <tbody id="tGasolinaBody"></tbody>
+          </table>
         </div>
       </div>
     </div>
@@ -1732,6 +1840,54 @@ function renderGasto(){
   bodyHTML += gtRow;
   
   document.getElementById('tGastoBody').innerHTML = bodyHTML;
+  renderGasolina();
+}
+
+function renderGasolina(){
+  var sems     = getSemanasActivas();
+  var gData    = DATA.gasolina_por_vehiculo || {};
+  var vehiculos = DATA.vehiculos_gasolina   || [];
+
+  // ── Cabecera ──
+  var headHTML = '<tr><th>Vehículo</th>';
+  sems.forEach(function(s){
+    var yr = Math.floor(s/100), wk = s%100;
+    var label = (yr >= 2000) ? yr+'-'+String(wk).padStart(2,'0') : String(s).padStart(2,'0');
+    headHTML += '<th>'+label+'</th>';
+  });
+  headHTML += '<th>Grand Total</th></tr>';
+  document.getElementById('tGasolinaHead').innerHTML = headHTML;
+
+  // ── Filas ──
+  var bodyHTML   = '';
+  var grandTotals = {};
+  var grandTotal  = 0;
+  sems.forEach(function(s){ grandTotals[s] = 0; });
+
+  vehiculos.forEach(function(veh){
+    var vehData  = gData[veh] || {};
+    var vehTotal = 0;
+    var vehRow   = '<tr class="ruta-row"><td><strong>'+veh+'</strong></td>';
+    sems.forEach(function(s){
+      var total = vehData[s] || 0;
+      vehTotal        += total;
+      grandTotals[s]  += total;
+      vehRow += '<td>'+(total > 0 ? '$'+fmt(total) : '—')+'</td>';
+    });
+    vehRow += '<td><strong>$'+fmt(vehTotal)+'</strong></td></tr>';
+    grandTotal += vehTotal;
+    bodyHTML   += vehRow;
+  });
+
+  // ── Grand Total ──
+  var gtRow = '<tr class="grand-total"><td><strong>Grand Total</strong></td>';
+  sems.forEach(function(s){
+    gtRow += '<td><strong>$'+fmt(grandTotals[s])+'</strong></td>';
+  });
+  gtRow += '<td><strong>$'+fmt(grandTotal)+'</strong></td></tr>';
+  bodyHTML += gtRow;
+
+  document.getElementById('tGasolinaBody').innerHTML = bodyHTML;
 }
 
 // ─── HELPERS GLOBALES COMPARATIVO ────────────────────────────────────────────
