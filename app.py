@@ -605,49 +605,33 @@ def cargar_datos(url: str = "") -> dict:
 # ══════════════════════════════════════════════════════
 # GASOLINA — SharePoint externo (pacificafarms)
 # ══════════════════════════════════════════════════════
-_GASOLINA_SHARED_LINK = "http://pacificafarms-my.sharepoint.com/:x:/g/personal/anahi_mora_cfbc_co/IQANE_rjNbe-T5n5XZuwt3FwAa9dla1RGnbl1oC9PGuNO-o?e=Zs5Rzw"
+_GASOLINA_SHARED_LINK = "https://pacificafarms-my.sharepoint.com/:x:/g/personal/anahi_mora_cfbc_co/IQANE_rjNbe-T5n5XZuwt3FwAa9dla1RGnbl1oC9PGuNO-o?e=QWr0JT&download=1"
 _VEHICULOS_GASOLINA   = ['FORD / TRANSIT 250 / 2020', 'FORD / TRANSIT / 2019']
 
 @st.cache_data(ttl=3600, show_spinner=False)
 def cargar_gasolina() -> dict:
     """
-    Descarga la hoja 'Base datos' desde SharePoint (link compartido).
+    Descarga la hoja 'Base datos' desde SharePoint usando link público directo.
     Columnas: F=Fecha (idx 5), L=Total (idx 11), R=Vehículo (idx 17).
-    Agrupa por vehículo → semana (YYYYSS) → total $.
-    Credenciales en st.secrets['sharepoint_gasolina']: tenant_id, client_id, client_secret.
+    Agrupa por vehículo → semana (YYYYWW) → total $.
+    No requiere autenticación.
     """
-    import datetime, math
+    import datetime, io
 
-    cfg = st.secrets["sharepoint_gasolina"]
-
-    # ── Auth ──
-    app_msal = msal.ConfidentialClientApplication(
-        cfg["client_id"],
-        authority=f"https://login.microsoftonline.com/{cfg['tenant_id']}",
-        client_credential=cfg["client_secret"],
-    )
-    token = app_msal.acquire_token_for_client(
-        scopes=["https://graph.microsoft.com/.default"]
-    )
-    if "access_token" not in token:
-        raise RuntimeError(f"Error auth gasolina: {token.get('error_description', token)}")
-
-    hdrs = {"Authorization": f"Bearer {token['access_token']}"}
-
-    # ── Codificar shared link → share token ──
-    encoded = base64.b64encode(
-        _GASOLINA_SHARED_LINK.encode()
-    ).decode().rstrip('=').replace('+', '-').replace('/', '_')
-    share_token = f"u!{encoded}"
-
-    # ── Leer usedRange de la hoja "Base datos" ──
-    url = (
-        f"https://graph.microsoft.com/v1.0/shares/{share_token}"
-        f"/driveItem/workbook/worksheets/Base%20datos/usedRange"
-    )
-    resp = requests.get(url, headers=hdrs, timeout=60)
+    resp = requests.get(_GASOLINA_SHARED_LINK, timeout=60)
     resp.raise_for_status()
-    values = resp.json().get("values", [])
+
+    wb_gas = openpyxl.load_workbook(io.BytesIO(resp.content), data_only=True)
+    if 'Base datos' in wb_gas.sheetnames:
+        ws_gas = wb_gas['Base datos']
+    elif any(s.lower() == 'base datos' for s in wb_gas.sheetnames):
+        ws_gas = wb_gas[[s for s in wb_gas.sheetnames if s.lower() == 'base datos'][0]]
+    else:
+        ws_gas = wb_gas.active
+
+    values = [list(row) for row in ws_gas.iter_rows(values_only=True)]
+
+
 
     # Índices de columna (0-based): F=5, L=11, R=17
     COL_FECHA = 5
