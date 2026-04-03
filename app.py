@@ -581,7 +581,8 @@ def cargar_datos(url: str = "") -> dict:
     # Estructura: Fecha | SC | Combustible (Transf.) | Viaticos | Casetas | Mantenimiento | ...
     # Cada columna a partir de la 3ª es un tipo de gasto con su monto.
     # Agrupamos: tipo_gasto → semana_key(YYYYWW) → total $
-    gastos_otros = defaultdict(lambda: defaultdict(float))
+    gastos_otros = defaultdict(lambda: defaultdict(lambda: defaultdict(float)))
+    gastos_sc_order = []  # orden de los SCs para el frontend
     gastos_tipos = []   # orden de los tipos de gasto para el frontend
     try:
         ws_gastos = None
@@ -627,12 +628,17 @@ def cargar_datos(url: str = "") -> dict:
                 _iso = _fdt.isocalendar()
                 _sem_key = int(_iso[0]) * 100 + int(_iso[1])
 
+                # Leer SC (columna 1 = col B del Excel)
+                _sc = str(_grow[1]).strip() if len(_grow) > 1 and _grow[1] else 'Sin SC'
+                if _sc and _sc not in gastos_sc_order:
+                    gastos_sc_order.append(_sc)
+
                 for _cidx, _ctipo in _gasto_cols:
                     _monto = _grow[_cidx] if _cidx < len(_grow) else None
                     if _monto is None:
                         continue
                     try:
-                        gastos_otros[_ctipo][_sem_key] += float(_monto)
+                        gastos_otros[_sc][_ctipo][_sem_key] += float(_monto)
                     except Exception:
                         pass
     except Exception:
@@ -653,8 +659,9 @@ def cargar_datos(url: str = "") -> dict:
         'producto_gasto': PRODUCTO_GASTO,
         'tienda_ruta': TIENDA_RUTA,
         'gasto_data': {k: {s: dict(p) for s,p in v.items()} for k,v in gasto_data.items()},
-        'gastos_otros': {tipo: dict(sems) for tipo, sems in gastos_otros.items()},
+        'gastos_otros': {sc: {tipo: dict(sems) for tipo, sems in tipos.items()} for sc, tipos in gastos_otros.items()},
         'gastos_tipos': gastos_tipos,
+        'gastos_sc': gastos_sc_order,
     }
     # Guardar en disco como caché permanente (sobrevive recargas)
     try:
@@ -1938,23 +1945,30 @@ function renderGasolina(){
     });
   }
 
-  // ── Sección: Otros Gastos (hoja Gastos del SharePoint) ──
-  var tiposConDatos = gTipos.filter(function(t){ return gOtros[t]; });
-  if(tiposConDatos.length > 0){
+  // ── Sección: Otros Gastos (hoja Gastos del SharePoint) agrupada por SC ──
+  var gSCs = DATA.gastos_sc || Object.keys(gOtros);
+  var scConDatos = gSCs.filter(function(sc){ return gOtros[sc]; });
+  if(scConDatos.length > 0){
     bodyHTML += '<tr style="background:#fff3e0;"><td colspan="'+(sems.length+2)+'" style="padding:2px 4px;font-size:.72rem;color:#555;">Otros Gastos</td></tr>';
-    tiposConDatos.forEach(function(tipo){
-      var tipoData  = gOtros[tipo] || {};
-      var tipoTotal = 0;
-      var tipoRow   = '<tr class="ruta-row"><td>'+tipo+'</td>';
-      sems.forEach(function(s){
-        var total = tipoData[s] || 0;
-        tipoTotal      += total;
-        grandTotals[s] += total;
-        tipoRow += '<td>'+(total > 0 ? '$'+fmt(total) : '—')+'</td>';
+    scConDatos.forEach(function(sc){
+      var scData = gOtros[sc] || {};
+      // Separador por SC
+      bodyHTML += '<tr style="background:#ffe8cc;"><td colspan="'+(sems.length+2)+'" style="padding:2px 8px;font-size:.72rem;color:#6b3a00;">'+sc+'</td></tr>';
+      var tiposEnSC = gTipos.filter(function(t){ return scData[t]; });
+      tiposEnSC.forEach(function(tipo){
+        var tipoData  = scData[tipo] || {};
+        var tipoTotal = 0;
+        var tipoRow   = '<tr class="ruta-row"><td>'+tipo+'</td>';
+        sems.forEach(function(s){
+          var total = tipoData[s] || 0;
+          tipoTotal      += total;
+          grandTotals[s] += total;
+          tipoRow += '<td>'+(total > 0 ? '$'+fmt(total) : '—')+'</td>';
+        });
+        tipoRow += '<td>$'+fmt(tipoTotal)+'</td></tr>';
+        grandTotal += tipoTotal;
+        bodyHTML   += tipoRow;
       });
-      tipoRow += '<td>$'+fmt(tipoTotal)+'</td></tr>';
-      grandTotal += tipoTotal;
-      bodyHTML   += tipoRow;
     });
   }
 
