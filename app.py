@@ -2722,4 +2722,4 @@ with st.expander("⠀"):
 
 # ── Render del dashboard ──────────────────────────────────────────────────────
 html_content = build_html()
-components.html(html_content, height=2400, scrolling=False)
+components.html(html_content, scrolling=False)
