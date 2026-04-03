@@ -1914,18 +1914,18 @@ function renderGasolina(){
 
   // ── Sección: Gasolina por Vehículo ──
   if(vehiculos.length > 0){
-    bodyHTML += '<tr style="background:#e8f0fb;"><td colspan="'+(sems.length+2)+'" style="padding:4px 8px;font-size:.68rem;font-weight:700;color:#0d1f3c;letter-spacing:.05em;">⛽ GASOLINA POR VEHÍCULO</td></tr>';
+
     vehiculos.forEach(function(veh){
       var vehData  = gData[veh] || {};
       var vehTotal = 0;
-      var vehRow   = '<tr class="ruta-row"><td style="padding-left:14px"><strong>'+veh+'</strong></td>';
+      var vehRow   = '<tr class="ruta-row"><td>'+veh+'</td>';
       sems.forEach(function(s){
         var total = vehData[s] || 0;
         vehTotal       += total;
         grandTotals[s] += total;
         vehRow += '<td>'+(total > 0 ? '$'+fmt(total) : '—')+'</td>';
       });
-      vehRow += '<td><strong>$'+fmt(vehTotal)+'</strong></td></tr>';
+      vehRow += '<td>$'+fmt(vehTotal)+'</td></tr>';
       grandTotal += vehTotal;
       bodyHTML   += vehRow;
     });
@@ -1934,18 +1934,18 @@ function renderGasolina(){
   // ── Sección: Otros Gastos (hoja Gastos del SharePoint) ──
   var tiposConDatos = gTipos.filter(function(t){ return gOtros[t]; });
   if(tiposConDatos.length > 0){
-    bodyHTML += '<tr style="background:#fff3e0;"><td colspan="'+(sems.length+2)+'" style="padding:4px 8px;font-size:.68rem;font-weight:700;color:#7a3f00;letter-spacing:.05em;">📋 OTROS GASTOS</td></tr>';
+
     tiposConDatos.forEach(function(tipo){
       var tipoData  = gOtros[tipo] || {};
       var tipoTotal = 0;
-      var tipoRow   = '<tr class="ruta-row"><td style="padding-left:14px"><strong>'+tipo+'</strong></td>';
+      var tipoRow   = '<tr class="ruta-row"><td>'+tipo+'</td>';
       sems.forEach(function(s){
         var total = tipoData[s] || 0;
         tipoTotal      += total;
         grandTotals[s] += total;
         tipoRow += '<td>'+(total > 0 ? '$'+fmt(total) : '—')+'</td>';
       });
-      tipoRow += '<td><strong>$'+fmt(tipoTotal)+'</strong></td></tr>';
+      tipoRow += '<td>$'+fmt(tipoTotal)+'</td></tr>';
       grandTotal += tipoTotal;
       bodyHTML   += tipoRow;
     });
