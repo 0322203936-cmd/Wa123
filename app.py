@@ -577,6 +577,67 @@ def cargar_datos(url: str = "") -> dict:
         if ruta and gasto > 0:
             gasto_data[ruta][r['semana']][r['producto']] += r['embarque_u']
 
+    # ==== OTROS GASTOS — hoja "Gastos" del mismo SharePoint principal ====
+    # Estructura: Fecha | SC | Combustible (Transf.) | Viaticos | Casetas | Mantenimiento | ...
+    # Cada columna a partir de la 3ª es un tipo de gasto con su monto.
+    # Agrupamos: tipo_gasto → semana_key(YYYYWW) → total $
+    gastos_otros = defaultdict(lambda: defaultdict(float))
+    gastos_tipos = []   # orden de los tipos de gasto para el frontend
+    try:
+        ws_gastos = None
+        for _sname in wb.sheetnames:
+            if _sname.strip().lower() == 'gastos':
+                ws_gastos = wb[_sname]
+                break
+
+        if ws_gastos is not None:
+            import datetime as _dtmod
+
+            # Leer encabezados de fila 1
+            _gst_hdrs = [str(c.value).strip() if c.value else ''
+                         for c in ws_gastos[1]]
+
+            # Col 0 = Fecha, Col 1 = SC, Col 2+ = tipos de gasto
+            _ig_fecha = 0
+            # Tipos de gasto: todas las columnas con encabezado a partir del índice 2
+            _gasto_cols = [(i, h) for i, h in enumerate(_gst_hdrs)
+                           if i >= 2 and h]
+            gastos_tipos = [h for _, h in _gasto_cols]
+
+            def _parse_fecha_g(v):
+                if isinstance(v, _dtmod.datetime):
+                    return v
+                if isinstance(v, _dtmod.date):
+                    return _dtmod.datetime(v.year, v.month, v.day)
+                if isinstance(v, (int, float)) and v > 0:
+                    return _dtmod.datetime(1899, 12, 30) + _dtmod.timedelta(days=int(v))
+                if isinstance(v, str):
+                    for _fmt in ('%Y-%m-%d', '%d/%m/%Y', '%m/%d/%Y'):
+                        try:
+                            return _dtmod.datetime.strptime(v[:10], _fmt)
+                        except Exception:
+                            pass
+                return None
+
+            for _grow in ws_gastos.iter_rows(min_row=2, values_only=True):
+                _fv = _grow[_ig_fecha] if _ig_fecha < len(_grow) else None
+                _fdt = _parse_fecha_g(_fv)
+                if _fdt is None:
+                    continue
+                _iso = _fdt.isocalendar()
+                _sem_key = int(_iso[0]) * 100 + int(_iso[1])
+
+                for _cidx, _ctipo in _gasto_cols:
+                    _monto = _grow[_cidx] if _cidx < len(_grow) else None
+                    if _monto is None:
+                        continue
+                    try:
+                        gastos_otros[_ctipo][_sem_key] += float(_monto)
+                    except Exception:
+                        pass
+    except Exception:
+        pass
+
     result_dict = {
         'semanas':           semanas,
         'tiendas':           tiendas,
@@ -591,7 +652,9 @@ def cargar_datos(url: str = "") -> dict:
         'inventario_por_producto': inventario_por_producto,
         'producto_gasto': PRODUCTO_GASTO,
         'tienda_ruta': TIENDA_RUTA,
-        'gasto_data': {k: {s: dict(p) for s,p in v.items()} for k,v in gasto_data.items()}
+        'gasto_data': {k: {s: dict(p) for s,p in v.items()} for k,v in gasto_data.items()},
+        'gastos_otros': {tipo: dict(sems) for tipo, sems in gastos_otros.items()},
+        'gastos_tipos': gastos_tipos,
     }
     # Guardar en disco como caché permanente (sobrevive recargas)
     try:
@@ -1013,7 +1076,7 @@ html,body{height:auto;overflow-y:auto}
       
       <!-- Tabla Gasto Gasolina -->
       <div class="box" style="overflow:visible !important; height:auto !important;">
-        <div class="box-hdr">Gasto Gasolina por Vehículo</div>
+        <div class="box-hdr">Gasto Gasolina y Otros Gastos</div>
         <div style="overflow:visible !important; height:auto !important;">
           <table class="t" id="tGasolina">
             <thead id="tGasolinaHead"></thead>
@@ -1828,12 +1891,14 @@ function renderGasto(){
 }
 
 function renderGasolina(){
-  var sems     = getSemanasActivas();
-  var gData    = DATA.gasolina_por_vehiculo || {};
-  var vehiculos = DATA.vehiculos_gasolina   || [];
+  var sems      = getSemanasActivas();
+  var gData     = DATA.gasolina_por_vehiculo || {};
+  var vehiculos = DATA.vehiculos_gasolina    || [];
+  var gOtros    = DATA.gastos_otros          || {};
+  var gTipos    = DATA.gastos_tipos          || Object.keys(gOtros);
 
   // ── Cabecera ──
-  var headHTML = '<tr><th>Vehículo</th>';
+  var headHTML = '<tr><th>Concepto</th>';
   sems.forEach(function(s){
     var yr = Math.floor(s/100), wk = s%100;
     var label = (yr >= 2000) ? yr+'-'+String(wk).padStart(2,'0') : String(s).padStart(2,'0');
@@ -1842,28 +1907,51 @@ function renderGasolina(){
   headHTML += '<th>Grand Total</th></tr>';
   document.getElementById('tGasolinaHead').innerHTML = headHTML;
 
-  // ── Filas ──
-  var bodyHTML   = '';
+  var bodyHTML    = '';
   var grandTotals = {};
   var grandTotal  = 0;
   sems.forEach(function(s){ grandTotals[s] = 0; });
 
-  vehiculos.forEach(function(veh){
-    var vehData  = gData[veh] || {};
-    var vehTotal = 0;
-    var vehRow   = '<tr class="ruta-row"><td><strong>'+veh+'</strong></td>';
-    sems.forEach(function(s){
-      var total = vehData[s] || 0;
-      vehTotal        += total;
-      grandTotals[s]  += total;
-      vehRow += '<td>'+(total > 0 ? '$'+fmt(total) : '—')+'</td>';
+  // ── Sección: Gasolina por Vehículo ──
+  if(vehiculos.length > 0){
+    bodyHTML += '<tr style="background:#e8f0fb;"><td colspan="'+(sems.length+2)+'" style="padding:4px 8px;font-size:.68rem;font-weight:700;color:#0d1f3c;letter-spacing:.05em;">⛽ GASOLINA POR VEHÍCULO</td></tr>';
+    vehiculos.forEach(function(veh){
+      var vehData  = gData[veh] || {};
+      var vehTotal = 0;
+      var vehRow   = '<tr class="ruta-row"><td style="padding-left:14px"><strong>'+veh+'</strong></td>';
+      sems.forEach(function(s){
+        var total = vehData[s] || 0;
+        vehTotal       += total;
+        grandTotals[s] += total;
+        vehRow += '<td>'+(total > 0 ? '$'+fmt(total) : '—')+'</td>';
+      });
+      vehRow += '<td><strong>$'+fmt(vehTotal)+'</strong></td></tr>';
+      grandTotal += vehTotal;
+      bodyHTML   += vehRow;
     });
-    vehRow += '<td><strong>$'+fmt(vehTotal)+'</strong></td></tr>';
-    grandTotal += vehTotal;
-    bodyHTML   += vehRow;
-  });
+  }
 
-  // ── Grand Total ──
+  // ── Sección: Otros Gastos (hoja Gastos del SharePoint) ──
+  var tiposConDatos = gTipos.filter(function(t){ return gOtros[t]; });
+  if(tiposConDatos.length > 0){
+    bodyHTML += '<tr style="background:#fff3e0;"><td colspan="'+(sems.length+2)+'" style="padding:4px 8px;font-size:.68rem;font-weight:700;color:#7a3f00;letter-spacing:.05em;">📋 OTROS GASTOS</td></tr>';
+    tiposConDatos.forEach(function(tipo){
+      var tipoData  = gOtros[tipo] || {};
+      var tipoTotal = 0;
+      var tipoRow   = '<tr class="ruta-row"><td style="padding-left:14px"><strong>'+tipo+'</strong></td>';
+      sems.forEach(function(s){
+        var total = tipoData[s] || 0;
+        tipoTotal      += total;
+        grandTotals[s] += total;
+        tipoRow += '<td>'+(total > 0 ? '$'+fmt(total) : '—')+'</td>';
+      });
+      tipoRow += '<td><strong>$'+fmt(tipoTotal)+'</strong></td></tr>';
+      grandTotal += tipoTotal;
+      bodyHTML   += tipoRow;
+    });
+  }
+
+  // ── Grand Total general ──
   var gtRow = '<tr class="grand-total"><td><strong>Grand Total</strong></td>';
   sems.forEach(function(s){
     gtRow += '<td><strong>$'+fmt(grandTotals[s])+'</strong></td>';
