@@ -886,13 +886,20 @@ html,body{height:auto;overflow-y:auto}
 #viewGasto .box-hdr{overflow:visible!important}
 #viewGasto .box>div{overflow:visible!important;height:auto!important;max-height:none!important}
 #viewGasto table{overflow:visible!important}
-#viewGasto table.t{font-size:.72rem}
-#viewGasto table.t th{font-size:.69rem;padding:2px 4px;white-space:nowrap}
-#viewGasto table.t td{padding:1px 4px;font-size:.72rem}
-#viewGasto .ruta-row td{background:#e8f4fd;font-weight:700;border-top:2px solid #0071ce;border-bottom:1px solid #bbb;font-size:.74rem}
-#viewGasto .unidad-row td{font-size:.69rem}
-#viewGasto .unidad-row td:first-child{padding-left:16px;color:#555}
-#viewGasto .grand-total td{background:#0071ce;color:white;font-weight:700;border-top:3px solid #004a8a;font-size:.74rem}
+/* ── Tabla izquierda: Presupuesto por Ruta (tamaño original) ── */
+#tGasto{font-size:.62rem}
+#tGasto th{font-size:.60rem;padding:2px 4px;white-space:nowrap}
+#tGasto td{padding:1px 4px;font-size:.62rem}
+#tGasto .ruta-row td{background:#e8f4fd;font-weight:700;border-top:2px solid #0071ce;border-bottom:1px solid #bbb;font-size:.64rem}
+#tGasto .unidad-row td{font-size:.60rem}
+#tGasto .unidad-row td:first-child{padding-left:16px;color:#555}
+#tGasto .grand-total td{background:#0071ce;color:white;font-weight:700;border-top:3px solid #004a8a;font-size:.64rem}
+/* ── Tabla derecha: Gasolina y Otros Gastos (tamaño más grande) ── */
+#tGasolina{font-size:.72rem}
+#tGasolina th{font-size:.69rem;padding:2px 4px;white-space:nowrap}
+#tGasolina td{padding:1px 4px;font-size:.72rem}
+#tGasolina .ruta-row td{background:#e8f4fd;font-weight:700;border-top:2px solid #0071ce;border-bottom:1px solid #bbb;font-size:.74rem}
+#tGasolina .grand-total td{background:#0071ce;color:white;font-weight:700;border-top:3px solid #004a8a;font-size:.74rem}
 </style>
 </head>
 <body>
