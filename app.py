@@ -1914,7 +1914,7 @@ function renderGasolina(){
 
   // ── Sección: Gasolina por Vehículo ──
   if(vehiculos.length > 0){
-    bodyHTML += '<tr style="background:#fff3e0;"><td colspan="'+(sems.length+2)+'" style="padding:4px 10px;font-size:.64rem;color:#555;">Gasolina por Vehículo</td></tr>';
+    bodyHTML += '<tr style="background:#fff3e0;"><td colspan="'+(sems.length+2)+'" style="padding:2px 4px;font-size:.62rem;color:#555;">Gasolina por Vehículo</td></tr>';
     vehiculos.forEach(function(veh){
       var vehData  = gData[veh] || {};
       var vehTotal = 0;
@@ -1934,7 +1934,7 @@ function renderGasolina(){
   // ── Sección: Otros Gastos (hoja Gastos del SharePoint) ──
   var tiposConDatos = gTipos.filter(function(t){ return gOtros[t]; });
   if(tiposConDatos.length > 0){
-    bodyHTML += '<tr style="background:#fff3e0;"><td colspan="'+(sems.length+2)+'" style="padding:4px 10px;font-size:.64rem;color:#555;">Otros Gastos</td></tr>';
+    bodyHTML += '<tr style="background:#fff3e0;"><td colspan="'+(sems.length+2)+'" style="padding:2px 4px;font-size:.62rem;color:#555;">Otros Gastos</td></tr>';
     tiposConDatos.forEach(function(tipo){
       var tipoData  = gOtros[tipo] || {};
       var tipoTotal = 0;
