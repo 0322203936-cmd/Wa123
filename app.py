@@ -1692,12 +1692,13 @@ html,body{height:auto;overflow:auto;margin:0;padding:0}
       </button>
       <div id="semDropMenu" style="display:none;position:absolute;top:100%;left:0;z-index:999;background:#fff;border:1px solid #bbb;border-radius:4px;box-shadow:0 3px 10px rgba(0,0,0,.15);min-width:200px;max-height:260px;overflow-y:auto;padding:4px 0"></div>
     </div>
-    <label>Ciudad:</label>
-    <select id="ciudadSelect" onchange="onCiudadChange(this.value)" style="border:1px solid #bbb;border-radius:4px;padding:3px 8px;font-size:.72rem;background:#fff;margin-right:12px;cursor:pointer;">
-      <option value="Todas">Todas las ciudades</option>
-      <option value="Tijuana">Tijuana</option>
-      <option value="Ensenada">Ensenada</option>
-      <option value="Mexicali">Mexicali</option>
+    <label>Ruta:</label>
+    <select id="rutaSelect" onchange="onRutaChange(this.value)" style="border:1px solid #bbb;border-radius:4px;padding:3px 8px;font-size:.72rem;background:#fff;margin-right:12px;cursor:pointer;">
+      <option value="Todas">Todas las rutas</option>
+      <option value="ENS">ENS</option>
+      <option value="MXL 1">MXL 1</option>
+      <option value="Ruta 2000">Ruta 2000</option>
+      <option value="Rutas Playas">Rutas Playas</option>
     </select>
     <label>Tienda:</label>
     <div style="position:relative;display:inline-block" id="tiendaDropWrap">
@@ -2633,8 +2634,12 @@ function applyTiendaSelection(selected){
   updateHeader();
   syncChkTodasTiendas();
   if(state.view==='producto') render();
+  else if(state.view==='tienda') renderTienda();
+  else if(state.view==='inventario') renderInventario();
+  else if(state.view==='comparativo') renderComparativo();
+  else if(state.view==='gasto') renderGasto();
   else if(state.view==='resumen') renderResumen();
-  else renderTienda();
+  else if(state.view==='choferes' && typeof renderChoferes === 'function') renderChoferes();
 }
 
 function updateTiendaLabel(){
@@ -2650,28 +2655,15 @@ function updateTiendaLabel(){
     lbl.textContent = sel.length+' tiendas seleccionadas';
   }
 }
-function onCiudadChange(ciudad) {
-  var map = {
-    'ENSENADA': ['ENSENADA', 'ENSENADA CENTRO'],
-    'TIJUANA': ['DIAZ ORDAZ', 'LOMAS DE SANTA FE', 'MACROPLAZA INSURGENTES', 'PACIFICO', 'PLAYAS DE TIJUANA', 'ROSARITO', 'TIJUANA 2000', 'TIJUANA HIPODROMO'],
-    'MEXICALI': ['GALERIAS DEL VALLE', 'MEXICALI', 'MEXICALI NOVENA', 'NUEVO MEXICALI', 'PLAZA SAN PEDRO', 'TECATE GARITA']
-  };
+function onRutaChange(ruta) {
   var chks = document.querySelectorAll('#tiendaDropMenu input[type=checkbox].tienda-chk');
   chks.forEach(function(chk) {
-    var t = chk.value.toUpperCase();
-    if (ciudad === 'Todas') {
+    var t = chk.value;
+    if (ruta === 'Todas') {
       chk.checked = true;
     } else {
-      var cityKey = ciudad.toUpperCase();
-      var allowed = map[cityKey] || [];
-      var isMatch = false;
-      for (var i = 0; i < allowed.length; i++) {
-        if (t.indexOf(allowed[i]) !== -1) {
-          isMatch = true;
-          break;
-        }
-      }
-      chk.checked = isMatch;
+      var tiendaRuta = (typeof DATA !== 'undefined' && DATA.tienda_ruta && DATA.tienda_ruta[t]) || 'Sin ruta';
+      chk.checked = (tiendaRuta === ruta);
     }
   });
   onTiendaChk();
@@ -2792,8 +2784,12 @@ function applyProductoSelection(selected){
   updateProductoLabel();
   syncChkTodosProductos();
   if(state.view==='producto') render();
+  else if(state.view==='tienda') renderTienda();
+  else if(state.view==='inventario') renderInventario();
+  else if(state.view==='comparativo') renderComparativo();
+  else if(state.view==='gasto') renderGasto();
   else if(state.view==='resumen') renderResumen();
-  else renderTienda();
+  else if(state.view==='choferes' && typeof renderChoferes === 'function') renderChoferes();
 }
 function updateProductoLabel(){
   var sel = state.productos_sel;
@@ -3320,6 +3316,17 @@ function setView(v){
     if(tiendaLabel) tiendaLabel.style.display = 'block';
   }
   
+  // Ocultar filtro de ruta en comparativo y tienda
+  var rutaSelect = document.getElementById('rutaSelect');
+  var rutaLabel = Array.from(document.querySelectorAll('.ctrl label')).find(el => el.textContent === 'Ruta:');
+  if(v==='tienda' || v==='comparativo'){
+    if(rutaSelect) rutaSelect.style.display = 'none';
+    if(rutaLabel) rutaLabel.style.display = 'none';
+  } else {
+    if(rutaSelect) rutaSelect.style.display = 'inline-block';
+    if(rutaLabel) rutaLabel.style.display = 'block';
+  }
+  
   if(v==='tienda'){ state.tiendaT = null; renderTienda(); }
   else if(v==='comparativo'){ if(!state.compMode) state.compMode='semanas'; renderComparativo(); }
   else if(v==='inventario'){ state.invMode = null; state.invSelected = null; renderInventario(); }
@@ -3597,7 +3604,8 @@ function renderInventario(){
 
   var sems    = getSemanasActivas();
   var detData = det.data;
-  var tiendas = Object.keys(detData).sort();
+  var selTiendas = getTiendasActivas();
+  var tiendas = Object.keys(detData).filter(function(t) { return selTiendas.indexOf(t) !== -1; }).sort();
 
   // ── Determinar fechas a mostrar según semanas activas ──
   var fechas;
@@ -3716,11 +3724,21 @@ function renderInventario(){
 
 function renderGasto(){
   var sems = getSemanasActivas();
+  var tiendas = getTiendasActivas();
   var gData = DATA.gasto_data;
   var pGasto = DATA.producto_gasto;
   
-  // Rutas ordenadas
-  var rutas = ['ENS', 'MXL 1', 'MXL 2', 'Ruta 2000', 'Rutas Playas'];
+  var rutasActivasSet = {};
+  tiendas.forEach(function(t) {
+    if(typeof DATA !== 'undefined' && DATA.tienda_ruta && DATA.tienda_ruta[t]) {
+      rutasActivasSet[DATA.tienda_ruta[t]] = true;
+    }
+  });
+  
+  // Rutas ordenadas y filtradas
+  var rutasTodas = ['ENS', 'MXL 1', 'Ruta 2000', 'Rutas Playas'];
+  var rutas = rutasTodas.filter(function(r) { return rutasActivasSet[r] || areAllTiendasSelected(state.tiendas_sel); });
+  if(!rutas.length) rutas = rutasTodas;
   
   // Construir headers de tabla
   var headHTML = '<tr><th>RUTA / PRODUCTO</th>';
@@ -4730,6 +4748,11 @@ function _filterWeekFromStore(proj, targetSem) {
 
 /* ── Borrar UNA semana específica de las capturas guardadas ── */
 function _clearWeekFromCapture(targetSem) {
+  // 0) Save any current unsaved data in DOM first!
+  if (typeof saveCaptureProjectionsFromDom === 'function') {
+    saveCaptureProjectionsFromDom();
+  }
+  
   // 1) Aplicar filtro local inmediatamente
   if (!window._captureProjections) window._captureProjections = { sem: {}, norm: {}, _meta: {} };
   _filterWeekFromStore(window._captureProjections, targetSem);
@@ -4744,8 +4767,15 @@ function _clearWeekFromCapture(targetSem) {
   fetch(url, {
     method: 'DELETE',
     headers: _supabaseHeaders()
+  }).then(function(res) {
+    if (!res.ok) {
+      console.warn('Supabase DELETE failed:', res.status, res.statusText);
+      alert('Error al borrar en Supabase (Código ' + res.status + '). Puede que falten permisos (RLS) para DELETE.');
+    } else {
+      console.log('Semana ' + targetSem + ' borrada de Supabase.');
+    }
   }).catch(function(err) {
-    console.warn('No se pudo borrar la semana en Supabase:', err);
+    console.warn('Error de red al borrar la semana en Supabase:', err);
   });
 }
 
@@ -5462,7 +5492,8 @@ function renderResumen(){
      Antes se guardaba el valor ya-incrementado en meta.nextSem y se restauraba tal cual,
      causando que al cambiar tienda la semana apareciera como 28 en vez de 26.
      La semana base siempre viene de DATA; los incrementos temporales no deben persistir. */
-  window._nextSemanaProyeccion = null;
+  /* [FIX REVERTIDO] No reiniciar window._nextSemanaProyeccion. 
+     El código anterior propagaba a las tiendas invisibles y por tanto el contador no debe reiniciarse. */
   var pivot    = collectResumenPivot('semanas');
   var defsAll  = getResumenMetricDefs();
   var metricFiltersBox = document.getElementById('metricFilters');
@@ -5811,7 +5842,7 @@ function renderResumen(){
       if(!window._captureProjections[modeKey]) window._captureProjections[modeKey] = {};
       var store = window._captureProjections[modeKey];
       var allTiendas = (typeof DATA !== 'undefined' && DATA.tiendas) || [];
-      var allProds   = (typeof getProductosActivos === 'function') ? getProductosActivos() : [];
+      var allProds   = (typeof DATA !== 'undefined' && DATA.productos) || [];
       var pivotMode  = state.resumenPivot || 'producto';
       /* Obtener filas de referencia de algún bloque visible */
       var blocks = window._resumenCaptureBlocks || [];
@@ -5837,11 +5868,15 @@ function renderResumen(){
           var existingSaved = (existing && existing.rows) ? existing.rows.filter(function(r){ return r.saved; }) : [];
           if(refRows) {
             /* Copiar las mismas filas de semana (sin guardar) pero con valores vacíos
-               (la tienda no visible no tiene valores propios aún) */
-            var clonedRows = refRows.map(function(r){
-              return { sem: r.sem, values: r.values.map(function(){ return ''; }), hidden: r.hidden, saved: false };
+               o conservar los valores si ya existían para no perder lo capturado sin guardar. */
+            var existingUnsaved = (existing && existing.rows) ? existing.rows.filter(function(r){ return !r.saved; }) : [];
+            var mergedRows = refRows.map(function(r, i){
+              var oldRow = existingUnsaved[i];
+              var vals = oldRow ? oldRow.values : r.values.map(function(){ return ''; });
+              var semVal = (oldRow && oldRow.sem) ? oldRow.sem : r.sem;
+              return { sem: semVal, values: vals, hidden: r.hidden, saved: false };
             });
-            store[sk] = { visibleInitial: newVisibleInitial, rows: existingSaved.concat(clonedRows) };
+            store[sk] = { visibleInitial: newVisibleInitial, rows: existingSaved.concat(mergedRows) };
           } else if(existing) {
             /* Solo actualizar el visibleInitial para sincronizar */
             existing.visibleInitial = newVisibleInitial;
@@ -6861,7 +6896,7 @@ function buildBarChart(labels, vals1, vals2, lbl1, lbl2, W, H){
 // ─── RENDER COMPARATIVO (solo Semana vs Semana) ───────────────────────────────
 function renderComparativo(){
   var sems = getSemanasActivas();
-  var tiendas = DATA.tiendas;
+  var tiendas = (typeof DATA !== 'undefined' && DATA.tiendas) ? DATA.tiendas : [];
   var prods = getProductosActivos();
   var semsAct = sems.length ? sems : DATA.semanas.slice(-4);
 
@@ -7028,7 +7063,8 @@ function renderComparativo(){
   // ── Gráfica lateral: actualiza según nivel activo ──────────────────────────
   var chartEl   = document.getElementById('compChart');
   var chartTitle = document.getElementById('compChartTitle');
-  var tiendas = DATA.tiendas; var prods = getProductosActivos();
+  var tiendas = (typeof DATA !== 'undefined' && DATA.tiendas) ? DATA.tiendas : [];
+  var prods = getProductosActivos();
 
   // Obtener la primera tienda abierta (si hay alguna)
   var firstOpenSem = null;
