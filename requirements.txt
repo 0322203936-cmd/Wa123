@@ -1,0 +1,6 @@
+streamlit
+openpyxl
+pandas
+msal
+requests
+supabase
