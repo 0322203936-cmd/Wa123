@@ -1961,6 +1961,7 @@ html,body{height:auto;overflow:auto;margin:0;padding:0}
           <div>Hasta: <input type="date" id="devHasta" onchange="renderDevoluciones()" style="font-size:11px; padding:2px; border:1px solid #ccc;"></div>
           <div>Folio: <input type="text" id="devFolioFilter" oninput="renderDevoluciones()" placeholder="Buscar folio..." style="font-size:11px; padding:2px; border:1px solid #ccc; width:100px;"></div>
           <div>Producto: <input type="text" id="devProductoFilter" oninput="renderDevoluciones()" placeholder="Buscar producto..." style="font-size:11px; padding:2px; border:1px solid #ccc; width:130px;"></div>
+          <button onclick="exportarDevolucionesExcel()" style="margin-left:auto; padding:4px 10px; font-size:11px; background:#16a34a; color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">Exportar</button>
         </div>
         <!-- Tabla -->
         <div style="overflow-x:auto;">
@@ -2319,6 +2320,31 @@ function openChoferesSubTab(tab) {
     }
 }
 
+function exportarDevolucionesExcel() {
+    var table = document.getElementById("devolucionesTable");
+    if (!table) return;
+    var clone = table.cloneNode(true);
+    var html = `
+    <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+    <head>
+    <!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>Devoluciones</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]-->
+    <meta charset="utf-8">
+    </head>
+    <body>
+      ${clone.outerHTML}
+    </body>
+    </html>
+    `;
+    var blob = new Blob(["\uFEFF" + html], { type: 'application/vnd.ms-excel;charset=utf-8;' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    a.href = url;
+    a.download = "Devoluciones.xls";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+}
+
 function renderDevoluciones() {
     var tbody = document.getElementById('devolucionesTbody');
     if (!tbody) return;
@@ -2544,6 +2570,7 @@ function init(){
   var chkAllT = document.createElement('input');
   chkAllT.type = 'checkbox';
   chkAllT.id = 'chkTodasTienda';
+  chkAllT.checked = true;
   chkAllT.onchange = function(){ toggleTodasTiendas(); };
   rowAllT.appendChild(chkAllT);
   rowAllT.appendChild(document.createTextNode('Seleccionar todas'));
@@ -2551,15 +2578,14 @@ function init(){
   
   DATA.tiendas.forEach(function(t){
     var labelTxt = t.replace('SC ','');
-    var isFirst = (t === DATA.tiendas[0]);
     var rowT = document.createElement('label');
-    rowT.className = 'sem-item' + (isFirst ? ' on' : '');
+    rowT.className = 'sem-item on';
     rowT.id = 'tienda-row-'+t;
     var chkT = document.createElement('input');
     chkT.type = 'checkbox';
     chkT.className = 'tienda-chk';
     chkT.value = t;
-    chkT.checked = isFirst;
+    chkT.checked = true;
     chkT.onchange = function(){ onTiendaChk(); };
     rowT.appendChild(chkT);
     rowT.appendChild(document.createTextNode(labelTxt));
@@ -2601,7 +2627,7 @@ function init(){
   state.semana = DATA.semanas[DATA.semanas.length-1];
   state.semanas_sel = [state.semana];
   state.tienda = DATA.tiendas[0];
-  state.tiendas_sel = [DATA.tiendas[0]];
+  state.tiendas_sel = DATA.tiendas.slice();
   updateResumenModeButtons();
   updateHeader(); updateSemLabel(); updateTiendaLabel(); render();
   document.getElementById('loader').style.display = 'none';
