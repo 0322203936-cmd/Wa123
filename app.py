@@ -42,9 +42,17 @@ def init_supabase() -> Client:
 def get_supabase_data():
     client = init_supabase()
     if not client: return []
+    all_data = []
     try:
-        resp = client.table('facturas_folios').select('*').execute()
-        return resp.data
+        page_size = 1000
+        for i in range(10): # Hasta 10,000 registros
+            resp = client.table('facturas_folios').select('*').range(i*page_size, (i+1)*page_size - 1).execute()
+            if not resp.data:
+                break
+            all_data.extend(resp.data)
+            if len(resp.data) < page_size:
+                break
+        return all_data
     except Exception as e:
         print("Error fetching Supabase data:", e)
         return []
