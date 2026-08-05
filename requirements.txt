@@ -4,3 +4,4 @@ pandas
 msal
 requests
 supabase
+starlette==0.41.3
