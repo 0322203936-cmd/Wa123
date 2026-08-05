@@ -3,5 +3,5 @@ openpyxl
 pandas
 msal
 requests
-supabase
+supabase==2.7.4
 starlette==0.41.3
